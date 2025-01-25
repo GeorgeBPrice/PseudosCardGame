@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { Card as CardUI, CardContent } from "@/app/components/ui/card";
+import { Card as MUICard, CardContent, Typography } from "@mui/material";
 import { CardType } from "./contexts/GameContext";
 
 interface CardProps {
@@ -24,7 +24,7 @@ interface CardProps {
  * @param {boolean} isSelected Whether the card should be rendered in a selected state.
  * @returns {React.ReactElement} A React element representing the Card component.
  */
-const Card: React.FC<CardProps> = ({
+const DraggableCard: React.FC<CardProps> = ({
   card,
   onSelectCard,
   disabled,
@@ -40,28 +40,38 @@ const Card: React.FC<CardProps> = ({
 
   const divRef = useRef<HTMLDivElement>(null);
 
+  const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+
   return (
-    <CardUI
+    <MUICard
       ref={(node) => {
         divRef;
         drag(node);
       }}
-      className={`w-16 h-24 sm:w-20 sm:h-28 flex items-center justify-center cursor-pointer ${
-        isDragging ? "opacity-50" : "opacity-100"
-      } ${disabled ? "cursor-not-allowed" : ""} ${
-        isSelected ? "border-4 border-yellow-500" : ""
-      }`}
       onClick={() => !disabled && onSelectCard(card)}
+      sx={{
+        width: { xs: 64, sm: 80 },
+        height: { xs: 96, sm: 112 },
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: disabled ? "not-allowed" : "pointer",
+        border: isSelected ? "3px solid gold" : "none",
+        opacity: isDragging ? 0.5 : 1,
+        transition: "transform 0.3s, box-shadow 0.3s",
+        "&:hover": {
+          transform: !disabled ? "translateY(-4px)" : "none",
+          boxShadow: !disabled ? 4 : "none",
+        },
+      }}
     >
-      <CardContent
-        className={`text-2xl font-bold ${
-          card.suit === "♥" || card.suit === "♦" ? "text-red-500" : "text-black"
-        }`}
-      >
-        {card.value}
-        {card.suit}
+      <CardContent sx={{ textAlign: "center", p: 0 }}>
+        <Typography variant="h6" fontWeight="bold" sx={{ color }}>
+          {card.value}
+          {card.suit}
+        </Typography>
       </CardContent>
-    </CardUI>
+    </MUICard>
   );
 };
 
@@ -101,12 +111,22 @@ const Hand: React.FC<HandProps> = ({
         handRef;
         drop(node);
       }}
-      className="mt-4"
+      style={{ marginTop: "1rem" }}
     >
-      <h2 className="text-lg font-bold mb-2">Your Hand</h2>
-      <div className="flex flex-wrap justify-center items-center gap-2">
+      <Typography variant="h6" fontWeight="bold" gutterBottom>
+        Your Hand
+      </Typography>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "0.5rem",
+        }}
+      >
         {cards.map((card) => (
-          <Card
+          <DraggableCard
             key={card.id}
             card={card}
             onSelectCard={onSelectCard}
