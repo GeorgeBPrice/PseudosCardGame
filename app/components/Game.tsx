@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { Card, CardContent } from "@/app/components/ui/card";
-import { Button } from "@/app/components/ui/button";
+import {
+  Card,
+  CardContent,
+  Button,
+  Typography,
+  Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 import Hand from "./Hand";
 import Deck from "./Deck";
 import PlayArea from "./PlayArea";
@@ -13,12 +22,65 @@ import { useGameContext, GameProvider, CardType } from "./contexts/GameContext";
 import Confetti from "react-confetti";
 
 /**
- * The main game component. This component renders the main game UI including the computer hand, play area, player hand, deck, and game controls.
- * The component is wrapped in a DndProvider so that drag-and-drop functionality can be used throughout the game.
- * The component uses the useGameContext hook to get the game state and the various functions for updating the game state.
- * The component also uses the useEffect hook to start the computer player's turn when the game is in the computer player's turn.
+ * A Dialog component that shows the game’s rules
+ * in a scrollable, user-friendly format.
+ */
+function RulesDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Pusoy Dos Variant – Rules</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body1" paragraph>
+          <strong>Objective:</strong> Be the first player to shed all your
+          cards.
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Gameplay:</strong> Players take turns playing one card,
+          doubles, or a hand of 5 to beat the previous play. If a player
+          cannot—or chooses not to—beat the previous play, they must draw a
+          card. The player who wins the round can start the next round with any
+          allowed card combination.
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Deck and Suit Values:</strong> This game uses a standard
+          52-card deck. Suits ascend in the order: ♠ (lowest), ♣, ♦, ♥
+          (highest). Card ranks ascend 2, 3, 4... 10, J, Q, K, A.
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Winning a Round:</strong> A round is won when your opponent
+          cannot beat your play. You then start the next round with any card
+          combination you want.
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Winning the Game:</strong> The first player to shed all of
+          their cards is immediately declared the winner.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button variant="contained" onClick={onClose}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
+ * The main game component. This component renders the main game UI
+ * including the computer hand, play area, player hand, deck, and
+ * game controls. The component uses the useGameContext hook to get
+ * the game state and update it as needed.
  */
 const GameContent: React.FC = () => {
+  // State for controlling the visibility of the Rules dialog
+  const [rulesOpen, setRulesOpen] = useState(false);
+
   const {
     playerHand,
     computerHand,
@@ -56,39 +118,116 @@ const GameContent: React.FC = () => {
     }
   };
 
+  // If both player and computer have 0 cards, game hasn't started yet
   if (playerHand.length === 0 && computerHand.length === 0) {
     return (
-      <Card className="w-full max-w-4xl mx-auto my-8">
-        <CardContent className="p-6 text-center">
-          <h2 className="text-2xl font-bold mb-4">Welcome to Psuedos!</h2>
-          <p className="text-lg mb-4">
+      <Card
+        sx={{
+          width: "100%",
+          maxWidth: "800px",
+          mx: "auto",
+          my: 4,
+          p: 2,
+          textAlign: "center",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <CardContent>
+          {/* Add Logo in Top-Right */}
+
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            Welcome to PseuDos
+            <span style={{ color: "red", fontSize: "30px" }}>❤️</span>
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 2 }}>
             The aim of the game is to get rid of all the cards in your hand.
             Good luck!
-          </p>
-          <Button onClick={startGame}>Start Game</Button>
+          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "center", gap: 2 }}>
+            <Button variant="contained" color="primary" onClick={startGame}>
+              Start Game
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setRulesOpen(true)}
+              sx={{ borderColor: "primary.main" }}
+            >
+              Show Rules
+            </Button>
+          </Box>
         </CardContent>
+
+        {/* Rules Dialog */}
+        <RulesDialog open={rulesOpen} onClose={() => setRulesOpen(false)} />
       </Card>
     );
   }
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <Card className="w-full max-w-4xl mx-auto my-8 relative">
+      <Card
+        sx={{
+          width: "100%",
+          maxWidth: "1300px",
+          mx: "auto",
+          my: 4,
+          position: "relative",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        {/* Winner Overlay */}
         {winner && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-center  bg-black bg-opacity-70 p-8 rounded-md">
-              <h2 className="text-4xl font-bold text-white mb-4">
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.6)",
+              borderRadius: "4px",
+            }}
+          >
+            <Box
+              sx={{
+                textAlign: "center",
+                p: 4,
+                borderRadius: 2,
+                backgroundColor: "rgba(0,0,0,0.5)",
+              }}
+            >
+              <Typography
+                variant="h3"
+                fontWeight="bold"
+                color="white"
+                gutterBottom
+              >
                 {winner === "player" ? "You Win!" : "Computer Wins!"}
-              </h2>
-              <p className="text-xl text-white mb-4">Congratulations!</p>
-              <Button onClick={playAgain}>Play Again</Button>
-            </div>
+              </Typography>
+              <Typography variant="h5" color="white" gutterBottom>
+                Congratulations!
+              </Typography>
+              <Button variant="contained" onClick={playAgain}>
+                Play Again
+              </Button>
+            </Box>
             <Confetti />
-          </div>
+          </Box>
         )}
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
+
+        <CardContent sx={{ p: 4 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
+              gap: "1.5rem",
+            }}
+          >
+            {/* Left Column: ComputerHand, PlayArea, PlayerHand */}
+            <Box>
               <ComputerHand cardCount={computerHand.length} />
               <PlayArea
                 playedCards={playArea}
@@ -104,10 +243,41 @@ const GameContent: React.FC = () => {
                 selectedCards={selectedCards}
                 disabled={currentPlayer !== "player" || winner !== null}
               />
-            </div>
-            <div className="flex flex-col items-center gap-4 pt-40">
+            </Box>
+
+            {/* Right Column: Deck, Draw/Play Buttons, Stats */}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+                mt: 20,
+              }}
+            >
+              {/* LOGO */}
+              <Typography
+                sx={{
+                  left: "10px",
+                  fontSize: "20px",
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: "regular",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  color: "#4e4e4e",
+                }}
+              >
+                PseuDos
+                <span style={{ color: "red", fontSize: "18px" }}>❤️</span>
+              </Typography>
+
+              {/* Deck to draw cards from */}
               <Deck cardsLeft={deckSize} />
+
               <Button
+                variant="contained"
+                color="secondary"
                 onClick={drawCard}
                 disabled={
                   currentPlayer !== "player" ||
@@ -117,7 +287,9 @@ const GameContent: React.FC = () => {
               >
                 Draw Card
               </Button>
+
               <Button
+                variant="contained"
                 onClick={playSelectedCards}
                 disabled={
                   currentPlayer !== "player" ||
@@ -127,18 +299,36 @@ const GameContent: React.FC = () => {
               >
                 Play Card{selectedCards.length === 2 ? "s" : ""}
               </Button>
-              <p className="text-lg font-semibold">
+
+              <Typography variant="subtitle1" fontWeight="bold">
                 Current Player: {currentPlayer}
-              </p>
-              <p className="text-md">{gameMessage}</p>
-              <div className="mt-4">
-                <p>Player Wins: {playerWins}</p>
-                <p>Computer Wins: {computerWins}</p>
-              </div>
-            </div>
-          </div>
+              </Typography>
+              <Typography variant="body2">{gameMessage}</Typography>
+
+              <Box sx={{ mt: 2, textAlign: "center" }}>
+                <Typography variant="body1">
+                  Player Wins: {playerWins}
+                </Typography>
+                <Typography variant="body1">
+                  Computer Wins: {computerWins}
+                </Typography>
+              </Box>
+
+              {/* Show Rules button on the right column as well */}
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setRulesOpen(true)}
+              >
+                Show Rules
+              </Button>
+            </Box>
+          </Box>
         </CardContent>
       </Card>
+
+      {/* Rules Dialog */}
+      <RulesDialog open={rulesOpen} onClose={() => setRulesOpen(false)} />
     </DndProvider>
   );
 };

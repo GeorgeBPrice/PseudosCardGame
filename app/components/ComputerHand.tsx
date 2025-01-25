@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardContent } from "@/app/components/ui/card";
+import { Card, CardContent, Typography } from "@mui/material";
 
 interface ComputerHandProps {
   cardCount: number;
@@ -14,16 +14,38 @@ interface ComputerHandProps {
  * @param {Object} props - The properties object.
  * @param {number} props.cardCount - The number of cards to display.
  */
-
 export default function ComputerHand({ cardCount }: ComputerHandProps) {
   return (
-    <div className="mb-4">
-      <h2 className="text-lg font-bold mb-2">Computer's Hand</h2>
-      <div className="flex justify-center gap-2">
+    <div style={{ marginBottom: "1rem" }}>
+      <Typography variant="h6" fontWeight="bold" gutterBottom>
+        Computer’s Hand
+      </Typography>
+      <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
         {Array.from({ length: cardCount }).map((_, index) => (
-          <Card key={index} className="w-12 h-16 bg-primary">
-            <CardContent className="p-0 flex items-center justify-center h-full">
-              <span className="text-primary-foreground">?</span>
+          <Card
+            key={index}
+            sx={{
+              width: { xs: 48, sm: 64 },
+              height: { xs: 72, sm: 96 },
+              backgroundColor: "primary.main",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "primary.contrastText",
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+              }}
+            >
+              <Typography variant="h5" component="span">
+                ?
+              </Typography>
             </CardContent>
           </Card>
         ))}

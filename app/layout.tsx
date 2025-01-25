@@ -1,8 +1,10 @@
+import React from "react";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+// import { Inter } from "next/font/google";
+// import "./globals.css";
+import ThemeRegistry from "./ThemeRegistry"; // Custom client-side theme provider
 
-const inter = Inter({ subsets: ["latin"] });
+//const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -11,12 +13,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body
+        style={{
+          minHeight: "100vh",
+          margin: 0,
+          // "Sexy" gradient across entire page
+          background: "linear-gradient(90deg, #00C9FF 0%, #92FE9D 100%)",
+        }}
+      >
+        {/* Wrap children with a client-side ThemeRegistry */}
+        <ThemeRegistry>{children}</ThemeRegistry>
+      </body>
     </html>
   );
 }

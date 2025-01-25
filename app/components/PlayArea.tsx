@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useDrop } from "react-dnd";
-import { Card as CardUI, CardContent } from "@/app/components/ui/card";
+import { Card as MUICard, CardContent, Typography } from "@mui/material";
 import { CardType } from "./contexts/GameContext";
 
 interface PlayAreaProps {
@@ -25,7 +25,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   onPlayCard,
   isDoublesRound,
 }) => {
-  const [, drop] = useDrop(() => ({
+  const [{ isOver }, drop] = useDrop(() => ({
     accept: "card",
     drop: (item: CardType) => {
       onPlayCard(item);
@@ -38,66 +38,127 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   const divRef = useRef<HTMLDivElement>(null);
 
   return (
-    <CardUI className="w-full h-96 bg-green-100 mb-4">
+    <MUICard
+      sx={{
+        width: "100%",
+        height: "24rem",
+        backgroundImage:
+          "linear-gradient(180deg, #fdf9ff  100%, #edeeff  100%)",
+        marginBottom: "1rem",
+        transition: "background-color 0.3s",
+        borderRadius: "1rem",
+        border: "2px solid",
+        borderStyle: "dashed",
+        borderColor: "#bbbeff",
+      }}
+    >
       <CardContent
-        className="h-full p-4 flex flex-col justify-center items-center overflow-y-auto"
         ref={(node) => {
           divRef;
           drop(node);
         }}
+        sx={{
+          height: "100%",
+          padding: "1rem",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          overflowY: "auto",
+        }}
       >
-        <h2 className="text-lg font-bold mb-2">
-          {playedCards.length === 0 ? "Play a Card" : "Cards in Play"}
-          {isDoublesRound && " (Doubles Round)"}
-        </h2>
-        <div className="flex flex-wrap justify-center items-center gap-2">
-          {playedCards.slice(-2).map((card, index) => (
-            <CardUI
-              key={card.id}
-              className={`w-16 h-24 sm:w-20 sm:h-28 flex items-center justify-center ${
-                index % 2 === 0 ? "border-blue-500" : "border-red-500"
-              } border-2`}
-            >
-              <CardContent
-                className={`text-2xl font-bold ${
-                  card.suit === "♥" || card.suit === "♦"
-                    ? "text-red-500"
-                    : "text-black"
-                }`}
+        <Typography variant="h6" fontWeight="bold" gutterBottom>
+          {playedCards.length === 0 ? "Play a Card" : "Cards in Play"}{" "}
+          {isDoublesRound && "(Doubles Round)"}
+        </Typography>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          {playedCards.slice(-2).map((card, index) => {
+            const color =
+              card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+            return (
+              <MUICard
+                key={card.id}
+                sx={{
+                  width: { xs: 64, sm: 80 },
+                  height: { xs: 96, sm: 112 },
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "2px solid",
+                  borderColor: index % 2 === 0 ? "blue" : "red",
+                }}
               >
-                {card.value}
-                {card.suit}
-              </CardContent>
-            </CardUI>
-          ))}
-        </div>
-        {selectedCards.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-md font-bold mb-2">You are playing:</h3>
-            <div className="flex flex-wrap justify-center items-center gap-2">
-              {selectedCards.map((card) => (
-                <CardUI
-                  key={card.id}
-                  className="w-16 h-24 sm:w-20 sm:h-28 flex items-center justify-center border-2 border-yellow-500 cursor-pointer"
-                  onClick={() => onDeselectCard(card)}
-                >
-                  <CardContent
-                    className={`text-2xl font-bold ${
-                      card.suit === "♥" || card.suit === "♦"
-                        ? "text-red-500"
-                        : "text-black"
-                    }`}
-                  >
+                <CardContent sx={{ p: 0, textAlign: "center" }}>
+                  <Typography variant="h6" fontWeight="bold" sx={{ color }}>
                     {card.value}
                     {card.suit}
-                  </CardContent>
-                </CardUI>
-              ))}
+                  </Typography>
+                </CardContent>
+              </MUICard>
+            );
+          })}
+        </div>
+
+        {/* Display currently selected cards (the ones about to be played) */}
+        {selectedCards.length > 0 && (
+          <div style={{ marginTop: "1rem", textAlign: "center" }}>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              You are playing:
+            </Typography>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
+              {selectedCards.map((card) => {
+                const color =
+                  card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+                return (
+                  <MUICard
+                    key={card.id}
+                    onClick={() => onDeselectCard(card)}
+                    sx={{
+                      width: { xs: 64, sm: 80 },
+                      height: { xs: 96, sm: 112 },
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "2px solid gold",
+                      cursor: "pointer",
+                      transition: "transform 0.3s, box-shadow 0.3s",
+                      "&:hover": {
+                        transform: "translateY(-4px)",
+                        boxShadow: 4,
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ p: 0, textAlign: "center" }}>
+                      <Typography variant="h6" fontWeight="bold" sx={{ color }}>
+                        {card.value}
+                        {card.suit}
+                      </Typography>
+                    </CardContent>
+                  </MUICard>
+                );
+              })}
             </div>
           </div>
         )}
       </CardContent>
-    </CardUI>
+    </MUICard>
   );
 };
 
