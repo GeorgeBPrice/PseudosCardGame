@@ -37,7 +37,8 @@ export const useGameContext = () => {
   return context;
 };
 
-const cardValues: { [key: string]: number } = {
+// Ranks: 2 (2) ... 10 (10), J(11), Q(12), K(13), A(14)
+const cardValues: Record<string, number> = {
   "2": 2,
   "3": 3,
   "4": 4,
@@ -50,10 +51,11 @@ const cardValues: { [key: string]: number } = {
   J: 11,
   Q: 12,
   K: 13,
-  A: 14, // Ensure Ace is the highest value
+  A: 14,
 };
 
-const suitValues: { [key: string]: number } = {
+// Suits: ♠(1) < ♣(2) < ♦(3) < ♥(4)  (lowest to highest)
+const suitValues: Record<string, number> = {
   "♠": 1,
   "♣": 2,
   "♦": 3,
@@ -63,10 +65,7 @@ const suitValues: { [key: string]: number } = {
 let deck: CardType[] = [];
 
 /**
- * Creates a shuffled deck of 52 cards, with each card represented as an
- * object with `id`, `suit`, and `value` properties.
- *
- * @returns {CardType[]} The shuffled deck of cards
+ * Create a shuffled 52-card deck (suits x ranks).
  */
 function createDeck() {
   const suits = ["♥", "♦", "♣", "♠"];
@@ -92,7 +91,6 @@ function createDeck() {
       newDeck.push({ id: newDeck.length, suit, value });
     }
   }
-
   return shuffleDeck(newDeck);
 }
 
@@ -103,19 +101,6 @@ function shuffleDeck(deck: CardType[]) {
   return deck;
 }
 
-/**
- * The GameProvider component provides a GameContext to its children. It manages the state
- * of the game, including the player's and computer's hands, the play area, the current player,
- * the deck size, the game message, the winner, the number of wins for each player, and whether
- * the round is doubles or singles. It also provides functions to start the game, select and
- * deselect cards, play selected cards, draw a card, and play again. The GameProvider also
- * handles the game logic, such as determining the winner of the game and whether the last move
- * is valid.
- *
- * @function GameProvider
- * @param {React.ReactNode} children React children to be rendered within the GameContext
- * @returns {React.ReactElement} A React element representing the GameProvider component
- */
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -127,44 +112,57 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     "player"
   );
   const [deckSize, setDeckSize] = useState(52);
-  const [gameMessage, setGameMessage] = useState<string>("");
+  const [gameMessage, setGameMessage] = useState("");
   const [winner, setWinner] = useState<"player" | "computer" | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [playerWins, setPlayerWins] = useState(0);
   const [computerWins, setComputerWins] = useState(0);
+
+  // This indicates *current move* (the one being played).
+  // We do still need to enforce "2 cards if last was doubles, else 1 if last was single".
   const [isDoublesRound, setIsDoublesRound] = useState(false);
+
+  // Track if the *last move* was double. Different from the *current* isDoublesRound
+  // so we can properly compare new plays to the last play.
+  const [lastMoveWasDouble, setLastMoveWasDouble] = useState(false);
+
+  // If the previous move ended with a "draw", that resets the round, so we skip some validity checks
   const [roundReset, setRoundReset] = useState(false);
 
   /**
-   * Initializes and starts a new game by creating a shuffled deck, dealing
-   * initial hands to the player and the computer, and setting the game to
-   * the started state. Resets relevant game states, such as the play area,
-   * selected cards, and winner status. Randomly determines which player will
-   * take the first turn and sets the game message accordingly.
+   * Start a new game with fresh deck/hands.
    */
-
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 2);
-    const initialComputerHand = deck.splice(0, 2);
+    const initialPlayerHand = deck.splice(0, 7);
+    const initialComputerHand = deck.splice(0, 7);
 
     setPlayerHand(initialPlayerHand);
     setComputerHand(initialComputerHand);
-    setDeckSize(42);
-    setGameStarted(true);
-    setGameMessage("Game started. Player's turn.");
-    setWinner(null);
+    setDeckSize(deck.length);
     setPlayArea([]);
     setSelectedCards([]);
-    setIsDoublesRound(false);
+    setGameMessage("");
+    setWinner(null);
+    setGameStarted(true);
 
+    setIsDoublesRound(false);
+    setLastMoveWasDouble(false);
+    setRoundReset(false);
+
+    // Randomly choose first player
     if (Math.random() < 0.5) {
       setCurrentPlayer("player");
+      setGameMessage("Game started. Player's turn.");
     } else {
       setCurrentPlayer("computer");
+      setGameMessage("Game started. Computer's turn.");
     }
   };
 
+  /**
+   * Moves a card from player's hand to selected, up to 2 if doubles.
+   */
   const selectCard = (card: CardType) => {
     if (selectedCards.length < 2) {
       setSelectedCards((prev) => [...prev, card]);
@@ -172,114 +170,148 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  /**
+   * Moves a card from selected back to player's hand.
+   */
   const deselectCard = (card: CardType) => {
     setSelectedCards((prev) => prev.filter((c) => c.id !== card.id));
     setPlayerHand((prev) => [...prev, card]);
   };
 
   /**
-   * Determines whether a given set of cards is a valid move, given the current
-   * state of the game. A valid move is one that either plays a higher card than
-   * the last played card(s) in the play area, or plays a card of equal value but
-   * higher suit. If the game is in a doubles round, the function ensures that
-   * exactly two cards are played. If the game is not in a doubles round, the
-   * function ensures that exactly one card is played.
-   *
-   * @param cards The cards to check for validity
-   * @returns true if the cards are a valid move, false otherwise
+   * Return the last move's cards (single or double).
+   * If no cards in play, returns [].
    */
-  const isValidMove = (cards: CardType[]): boolean => {
-    if (cards.length === 0 || cards.length > 2) return false;
-
-    // If playing doubles, ensure both cards have the same value
-    if (cards.length === 2 && cards[0].value !== cards[1].value) return false;
-
-    // Get the last played card(s) from the play area
-    const lastPlayedCards = playArea.slice(-Math.min(playArea.length, 2));
-
-    if (lastPlayedCards.length === 0) return true; // If no cards are in play, any move is valid
-
-    const lastPlayedValue = cardValues[lastPlayedCards[0].value];
-    const lastPlayedSuit = suitValues[lastPlayedCards[0].suit];
-    const playedValue = cardValues[cards[0].value];
-    const playedSuit = suitValues[cards[0].suit];
-
-    // Enforce round rules (single vs. doubles)
-    if (isDoublesRound && cards.length === 1) return false;
-    if (!isDoublesRound && cards.length === 2) return false;
-
-    // Compare values first
-    if (playedValue > lastPlayedValue) return true;
-
-    // If values are equal, compare suits
-    return playedValue === lastPlayedValue && playedSuit > lastPlayedSuit;
+  const getLastPlayedCards = (): CardType[] => {
+    if (playArea.length === 0) return [];
+    if (lastMoveWasDouble && playArea.length >= 2) {
+      // Last move was a double, so the last 2 cards in the array
+      return playArea.slice(-2);
+    }
+    // Otherwise single: just last card
+    return playArea.slice(-1);
   };
 
   /**
-   * Plays the selected cards in the play area. If the player is the current player,
-   * removes the selected cards from the player's hand and updates the game message
-   * accordingly. If the computer is the current player, removes the selected cards
-   * from the computer's hand and updates the game message accordingly. If the round
-   * is reset, bypasses the validity check and plays the selected cards anyway.
-   * Sets the round state after a valid play. If the player or computer has played
-   * their last card, updates the game message to indicate that the other player
-   * must respond.
+   * Compare the new 'cards' to see if they beat the *last* move.
+   * - If last was double, the new move must be double, same or higher rank, etc.
+   * - If last was single, the new move must be single, higher rank, or same rank + higher suit.
+   */
+  const isValidMove = (cards: CardType[]): boolean => {
+    if (!cards.length) return false;
+
+    // Must match single/double from last move, unless roundReset (someone drew)
+    if (!roundReset) {
+      if (lastMoveWasDouble && cards.length !== 2) {
+        return false; // must play double if last move was double
+      }
+      if (!lastMoveWasDouble && cards.length !== 1) {
+        return false; // must play single if last move was single
+      }
+    }
+
+    // For doubles, ensure both are same rank
+    if (cards.length === 2 && cards[0].value !== cards[1].value) {
+      return false;
+    }
+
+    const lastPlayed = getLastPlayedCards();
+    if (!lastPlayed.length) {
+      // Nothing in play => any valid single/double is ok
+      return true;
+    }
+
+    // Evaluate rank/suit of the last played
+    if (lastPlayed.length === 1) {
+      // Single -> compare new single
+      const lastCard = lastPlayed[0];
+      const lastRank = cardValues[lastCard.value];
+      const lastSuit = suitValues[lastCard.suit];
+
+      const newCard = cards[0];
+      const newRank = cardValues[newCard.value];
+      const newSuit = suitValues[newCard.suit];
+
+      // Compare rank first
+      if (newRank > lastRank) return true;
+      // If rank is the same, compare suit
+      if (newRank === lastRank && newSuit > lastSuit) return true;
+      return false;
+    } else {
+      // Double -> compare new double
+      // The last double has the same rank, but we might want the highest suit from the last pair
+      const [c1, c2] = lastPlayed;
+      const lastRank = cardValues[c1.value]; // c1 and c2 have same rank
+      const lastSuits = [suitValues[c1.suit], suitValues[c2.suit]];
+      const lastMaxSuit = Math.max(...lastSuits);
+
+      const [n1, n2] = cards;
+      const newRank = cardValues[n1.value]; // n1 and n2 have same rank
+      const newSuits = [suitValues[n1.suit], suitValues[n2.suit]];
+      const newMaxSuit = Math.max(...newSuits);
+
+      // Compare rank
+      if (newRank > lastRank) return true;
+      // If rank is same, compare the highest suit in each pair
+      if (newRank === lastRank && newMaxSuit > lastMaxSuit) return true;
+      return false;
+    }
+  };
+
+  /**
+   * Attempts to play the selectedCards if valid.
    */
   const playSelectedCards = () => {
-    if (selectedCards.length === 0) return; // No cards selected
+    if (!selectedCards.length) return;
 
-    // Bypass validity check if round is reset
+    // If not in a "draw reset" state, check validity
     if (!roundReset && !isValidMove(selectedCards)) {
+      // Return cards to player's hand
       setPlayerHand((prev) => [...prev, ...selectedCards]);
       setSelectedCards([]);
       setGameMessage("Invalid move. Please try again.");
       return;
     }
 
+    // Valid => add to table
     setPlayArea((prev) => [...prev, ...selectedCards]);
 
+    // If the current player is the user
     if (currentPlayer === "player") {
       setPlayerHand((prev) =>
         prev.filter((card) => !selectedCards.includes(card))
       );
-
+      // Did they run out of cards?
       if (playerHand.length - selectedCards.length === 0) {
-        setGameMessage(
-          "Player has played their last card. Computer must respond!"
-        );
+        setGameMessage("Player has no more cards!");
       } else {
         setGameMessage("Player played. Computer's turn.");
       }
-
       setCurrentPlayer("computer");
     } else {
+      // If the current player is computer
       setComputerHand((prev) =>
         prev.filter((card) => !selectedCards.includes(card))
       );
-
       if (computerHand.length - selectedCards.length === 0) {
-        setGameMessage(
-          "Computer has played their last card. Player must respond!"
-        );
+        setGameMessage("Computer has no more cards!");
       } else {
         setGameMessage("Computer played. Player's turn.");
       }
-
       setCurrentPlayer("player");
     }
 
+    // If we just played doubles, or single
     setIsDoublesRound(selectedCards.length === 2);
+    setLastMoveWasDouble(selectedCards.length === 2);
+
+    // Reset selection
     setSelectedCards([]);
-    setRoundReset(false); // Reset round state after a valid play
+    setRoundReset(false);
   };
 
   /**
-   * Draws a card from the deck and adds it to the current player's hand. If the
-   * deck is empty, does nothing. If the player is the current player, sets the
-   * game message to indicate that the computer's turn has started. If the
-   * computer is the current player, sets the game message to indicate that the
-   * player's turn has started. Updates the deck size and current player after
-   * drawing a card. Sets the round state to reset after drawing a card.
+   * Draw a card from the deck for the current player, skipping validity checks.
    */
   const drawCard = () => {
     if (deckSize > 0) {
@@ -292,122 +324,130 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
           setComputerHand((prev) => [...prev, newCard]);
           setGameMessage("Computer drew a card. Player's turn.");
         }
+        setDeckSize((prev) => prev - 1);
       }
-      setDeckSize((prev) => prev - 1);
+      // Switch turn
       setCurrentPlayer(currentPlayer === "player" ? "computer" : "player");
-      setIsDoublesRound(false);
-      setRoundReset(true);
+      setIsDoublesRound(false); // new round
+      setRoundReset(true); // any move is valid next
     }
   };
 
   /**
-   * Executes the computer's turn by attempting to play valid cards from its hand.
-   * In a doubles round, the computer will try to play two cards of the same value
-   * that are higher than the last played cards. In a singles round, it will play
-   * a single card that is higher in value or suit than the last played card.
-   * If no valid play is possible, the computer will draw a card from the deck.
-   * After playing, the turn is passed to the player, and the game message is updated
-   * accordingly. The round state is reset after a valid play.
+   * Computer tries to find a valid card or draws if none found.
    */
   const computerPlay = () => {
     if (computerHand.length === 0) return;
 
-    const lastPlayedCards = playArea.slice(-2);
-    let playableCards: CardType[] = [];
+    const lastPlayed = getLastPlayedCards();
 
+    // Helper to see if 'card' is strictly higher than 'lastCard'
+    // (Rank first, then suit)
     const isCardHigher = (card: CardType, lastCard: CardType) => {
       const cardValue = cardValues[card.value];
       const lastCardValue = cardValues[lastCard.value];
-
       if (cardValue > lastCardValue) return true;
-      if (cardValue === lastCardValue)
+      if (cardValue === lastCardValue) {
         return suitValues[card.suit] > suitValues[lastCard.suit];
+      }
       return false;
     };
 
-    if (isDoublesRound) {
+    // Single or double from *last move*.
+    if (lastMoveWasDouble && !roundReset) {
+      // Attempt to play a higher double
+      const [lc1] = lastPlayed; // both have same rank
       for (let i = 0; i < computerHand.length; i++) {
         for (let j = i + 1; j < computerHand.length; j++) {
-          if (
-            computerHand[i].value === computerHand[j].value &&
-            (lastPlayedCards.length === 0 ||
-              isCardHigher(computerHand[i], lastPlayedCards[0]))
-          ) {
-            playableCards = [computerHand[i], computerHand[j]];
-            break;
+          if (computerHand[i].value === computerHand[j].value) {
+            // Found a pair
+            // Compare rank/suit to the last pair
+            const candidatePair = [computerHand[i], computerHand[j]];
+            if (isValidMove(candidatePair)) {
+              // Found a valid pair
+              setComputerHand((prev) =>
+                prev.filter((c) => !candidatePair.includes(c))
+              );
+              setPlayArea((prev) => [...prev, ...candidatePair]);
+              setGameMessage(
+                `Computer played 2 cards (${candidatePair[0].value}s). Player's turn.`
+              );
+              setCurrentPlayer("player");
+              setIsDoublesRound(true);
+              setLastMoveWasDouble(true);
+              setRoundReset(false);
+              return;
+            }
           }
         }
-        if (playableCards.length > 0) break;
       }
-    } else {
-      playableCards = computerHand.filter(
-        (card) =>
-          roundReset || // Allow any card on round reset
-          lastPlayedCards.length === 0 ||
-          isCardHigher(card, lastPlayedCards[0])
-      );
-    }
-
-    if (playableCards.length > 0) {
-      const cardsToPlay = isDoublesRound
-        ? playableCards.slice(0, 2)
-        : [playableCards[0]];
-      setComputerHand((prev) => prev.filter((c) => !cardsToPlay.includes(c)));
-      setPlayArea((prev) => [...prev, ...cardsToPlay]);
-      setGameMessage(
-        `Computer played ${cardsToPlay.length} card(s). Player's turn.`
-      );
-      setIsDoublesRound(cardsToPlay.length === 2);
-      setRoundReset(false); // Reset round state after a valid play
-    } else {
+      // No valid pair found => draw
       drawCard();
-    }
+      return;
+    } else {
+      // Single scenario or round reset
+      // If roundReset = true, any single is valid, so pick the lowest or random card
+      let playableCards: CardType[];
 
-    setCurrentPlayer("player");
+      if (roundReset || lastPlayed.length === 0) {
+        // Round reset or no cards => any single is valid
+        playableCards = computerHand;
+      } else {
+        // Must beat the last single card
+        const lastCard = lastPlayed[0];
+        playableCards = computerHand.filter((c) => isCardHigher(c, lastCard));
+      }
+
+      if (playableCards.length > 0) {
+        // Let's pick the *lowest* valid card to keep AI somewhat “logical”
+        // e.g. sorted ascending by rank/suit
+        playableCards.sort((a, b) => {
+          const valDiff = cardValues[a.value] - cardValues[b.value];
+          if (valDiff !== 0) return valDiff;
+          return suitValues[a.suit] - suitValues[b.suit];
+        });
+
+        const chosen = playableCards[0];
+        setComputerHand((prev) => prev.filter((c) => c.id !== chosen.id));
+        setPlayArea((prev) => [...prev, chosen]);
+        setGameMessage(
+          `Computer played ${chosen.value}${chosen.suit}. Player's turn.`
+        );
+        setCurrentPlayer("player");
+        setIsDoublesRound(false);
+        setLastMoveWasDouble(false);
+        setRoundReset(false);
+      } else {
+        // No valid single => draw
+        drawCard();
+      }
+    }
   };
 
+  /**
+   * Start a fresh game after it ends.
+   */
   const playAgain = () => {
     startGame();
   };
 
   /**
-   * Effect to handle game state updates after player or computer makes a move.
-   * Checks if the game has been won and updates the winner and win counts
-   * accordingly. Also handles invalid moves by reverting the last play.
+   * After each update, check if someone is out of cards => they win.
    */
   useEffect(() => {
     if (!gameStarted || winner) return;
 
-    const lastPlayer = currentPlayer === "player" ? "computer" : "player";
-
-    if (playerHand.length === 0 && isValidMove(playArea.slice(-1))) {
+    if (playerHand.length === 0) {
       setWinner("player");
       setPlayerWins((prev) => prev + 1);
       setGameMessage("Player wins the game!");
-    } else if (computerHand.length === 0 && isValidMove(playArea.slice(-1))) {
+    } else if (computerHand.length === 0) {
       setWinner("computer");
       setComputerWins((prev) => prev + 1);
       setGameMessage("Computer wins the game!");
-    } else if (
-      (playerHand.length === 0 || computerHand.length === 0) &&
-      !isValidMove(playArea.slice(-1))
-    ) {
-      // If the last move is invalid, revert the last play
-      if (lastPlayer === "player") {
-        setPlayerHand((prev) => [
-          ...prev,
-          ...playArea.slice(-selectedCards.length),
-        ]);
-      } else {
-        setComputerHand((prev) => [
-          ...prev,
-          ...playArea.slice(-selectedCards.length),
-        ]);
-      }
-      setPlayArea((prev) => prev.slice(0, -selectedCards.length));
-      setGameMessage("Invalid move! Reverting last play.");
     }
-  }, [gameStarted, winner, playerHand, computerHand, playArea]);
+  }, [gameStarted, winner, playerHand, computerHand]);
+
   return (
     <GameContext.Provider
       value={{
