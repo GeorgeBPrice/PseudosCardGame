@@ -18,6 +18,7 @@ interface GameContextType {
   playerWins: number;
   computerWins: number;
   isDoublesRound: boolean;
+  isFiveCardRound: boolean;
   selectCard: (card: CardType) => void;
   deselectCard: (card: CardType) => void;
   playSelectedCards: () => void;
@@ -27,6 +28,15 @@ interface GameContextType {
   playAgain: () => void;
 }
 
+/**
+ * The game context contains the state and actions of the game.
+ * It includes the current player, the cards in the player's hand,
+ * the cards in the computer's hand, the cards in the play area,
+ * the cards that are currently selected, the number of cards in the deck,
+ * and the game message (like "Player's turn" or "Computer wins!").
+ * It also includes functions to select and deselect cards, play the selected cards,
+ * draw a card from the deck, make the computer play, start a new game, and play again.
+ */
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const useGameContext = () => {
@@ -60,6 +70,41 @@ const suitValues: Record<string, number> = {
   "♣": 2,
   "♦": 3,
   "♥": 4,
+};
+
+/**
+ * Check if the given 5 cards form a valid straight
+ * Aces are always high in straights (10,J,Q,K,A)
+ */
+export const isValidStraight = (cards: CardType[]): boolean => {
+  if (cards.length !== 5) return false;
+  
+  // Sort cards by value, treating Aces as highest
+  const sortedCards = [...cards].sort((a, b) => {
+    const aValue = a.value === 'A' ? 14 : cardValues[a.value];
+    const bValue = b.value === 'A' ? 14 : cardValues[b.value];
+    return aValue - bValue;
+  });
+  
+  // Special case for A-high straight (10,J,Q,K,A)
+  if (sortedCards[0].value === '10' && 
+      sortedCards[1].value === 'J' && 
+      sortedCards[2].value === 'Q' && 
+      sortedCards[3].value === 'K' && 
+      sortedCards[4].value === 'A') {
+    return true;
+  }
+  
+  // Check if values are consecutive
+  for (let i = 1; i < sortedCards.length; i++) {
+    const prevValue = sortedCards[i-1].value === 'A' ? 14 : cardValues[sortedCards[i-1].value];
+    const currValue = sortedCards[i].value === 'A' ? 14 : cardValues[sortedCards[i].value];
+    if (currValue !== prevValue + 1) {
+      return false;
+    }
+  }
+  
+  return true;
 };
 
 let deck: CardType[] = [];
@@ -117,16 +162,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   const [gameStarted, setGameStarted] = useState(false);
   const [playerWins, setPlayerWins] = useState(0);
   const [computerWins, setComputerWins] = useState(0);
-
-  // This indicates *current move* (the one being played).
-  // We do still need to enforce "2 cards if last was doubles, else 1 if last was single".
   const [isDoublesRound, setIsDoublesRound] = useState(false);
-
-  // Track if the *last move* was double. Different from the *current* isDoublesRound
-  // so we can properly compare new plays to the last play.
+  const [isFiveCardRound, setIsFiveCardRound] = useState(false);
   const [lastMoveWasDouble, setLastMoveWasDouble] = useState(false);
-
-  // If the previous move ended with a "draw", that resets the round, so we skip some validity checks
+  const [lastMoveWasFiveCard, setLastMoveWasFiveCard] = useState(false);
   const [roundReset, setRoundReset] = useState(false);
 
   /**
@@ -134,8 +173,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 7);
-    const initialComputerHand = deck.splice(0, 7);
+    const initialPlayerHand = deck.splice(0, 9);
+    const initialComputerHand = deck.splice(0, 9);
 
     setPlayerHand(initialPlayerHand);
     setComputerHand(initialComputerHand);
@@ -147,7 +186,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     setGameStarted(true);
 
     setIsDoublesRound(false);
+    setIsFiveCardRound(false);
     setLastMoveWasDouble(false);
+    setLastMoveWasFiveCard(false);
     setRoundReset(false);
 
     // Randomly choose first player
@@ -161,10 +202,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   /**
-   * Moves a card from player's hand to selected, up to 2 if doubles.
+   * Moves a card from player's hand to selected, up to 5.
    */
   const selectCard = (card: CardType) => {
-    if (selectedCards.length < 2) {
+    if (selectedCards.length < 5) {
       setSelectedCards((prev) => [...prev, card]);
       setPlayerHand((prev) => prev.filter((c) => c.id !== card.id));
     }
@@ -193,6 +234,73 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   /**
+   * Check if the given 5 cards form a valid triple + 2 random cards combination
+   */
+  const isValidTriplePlusTwo = (cards: CardType[]): boolean => {
+    if (cards.length !== 5) return false;
+    
+    // Count occurrences of each value
+    const valueCounts: Record<string, number> = {};
+    cards.forEach(card => {
+      valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
+    });
+    
+    // Check if there's a value that appears 3 times
+    return Object.values(valueCounts).some(count => count === 3);
+  };
+
+  /**
+   * Get the highest suit in a straight for tie-breaking
+   */
+  const getHighestSuitInStraight = (cards: CardType[]): number => {
+    // Sort cards by value and suit
+    const sortedCards = [...cards].sort((a, b) => {
+      const aValue = a.value === 'A' ? 14 : cardValues[a.value];
+      const bValue = b.value === 'A' ? 14 : cardValues[b.value];
+      if (aValue !== bValue) return bValue - aValue;
+      return suitValues[b.suit] - suitValues[a.suit];
+    });
+    
+    return suitValues[sortedCards[0].suit];
+  };
+
+  /**
+   * Compare two 5-card combinations to determine if the new one beats the last one
+   */
+  const compareFiveCardCombinations = (newCards: CardType[], lastCards: CardType[]): boolean => {
+    const isNewStraight = isValidStraight(newCards);
+    const isLastStraight = isValidStraight(lastCards);
+    
+    // Straight always beats triple + 2
+    if (isNewStraight && !isLastStraight) return true;
+    if (!isNewStraight && isLastStraight) return false;
+    
+    if (isNewStraight && isLastStraight) {
+      // Compare highest card in straights
+      const newHighest = Math.max(...newCards.map(c => c.value === 'A' ? 14 : cardValues[c.value]));
+      const lastHighest = Math.max(...lastCards.map(c => c.value === 'A' ? 14 : cardValues[c.value]));
+      
+      if (newHighest > lastHighest) return true;
+      if (newHighest < lastHighest) return false;
+      
+      // If highest cards are equal, compare suits
+      return getHighestSuitInStraight(newCards) > getHighestSuitInStraight(lastCards);
+    }
+    
+    // Both are triple + 2, compare the triple value
+    const getTripleValue = (cards: CardType[]): number => {
+      const valueCounts: Record<string, number> = {};
+      cards.forEach(card => {
+        valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
+      });
+      const tripleValue = Object.entries(valueCounts).find(([_, count]) => count === 3)?.[0];
+      return tripleValue ? (tripleValue === 'A' ? 14 : cardValues[tripleValue]) : 0;
+    };
+    
+    return getTripleValue(newCards) > getTripleValue(lastCards);
+  };
+
+  /**
    * Compare the new 'cards' to see if they beat the *last* move.
    * - If last was double, the new move must be double, same or higher rank, etc.
    * - If last was single, the new move must be single, higher rank, or same rank + higher suit.
@@ -200,12 +308,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   const isValidMove = (cards: CardType[]): boolean => {
     if (!cards.length) return false;
 
-    // Must match single/double from last move, unless roundReset (someone drew)
+    // Must match single/double/five from last move, unless roundReset (someone drew)
     if (!roundReset) {
       if (lastMoveWasDouble && cards.length !== 2) {
         return false; // must play double if last move was double
       }
-      if (!lastMoveWasDouble && cards.length !== 1) {
+      if (lastMoveWasFiveCard && cards.length !== 5) {
+        return false; // must play five if last move was five
+      }
+      if (!lastMoveWasDouble && !lastMoveWasFiveCard && cards.length !== 1) {
         return false; // must play single if last move was single
       }
     }
@@ -215,9 +326,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       return false;
     }
 
+    // For five cards, must be either triple + 2 or straight
+    if (cards.length === 5 && !isValidTriplePlusTwo(cards) && !isValidStraight(cards)) {
+      return false;
+    }
+
     const lastPlayed = getLastPlayedCards();
     if (!lastPlayed.length) {
-      // Nothing in play => any valid single/double is ok
+      // Nothing in play => any valid single/double/five is ok
       return true;
     }
 
@@ -237,9 +353,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       // If rank is the same, compare suit
       if (newRank === lastRank && newSuit > lastSuit) return true;
       return false;
-    } else {
+    } else if (lastPlayed.length === 2) {
       // Double -> compare new double
-      // The last double has the same rank, but we might want the highest suit from the last pair
       const [c1, c2] = lastPlayed;
       const lastRank = cardValues[c1.value]; // c1 and c2 have same rank
       const lastSuits = [suitValues[c1.suit], suitValues[c2.suit]];
@@ -255,7 +370,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       // If rank is same, compare the highest suit in each pair
       if (newRank === lastRank && newMaxSuit > lastMaxSuit) return true;
       return false;
+    } else if (lastPlayed.length === 5) {
+      // Five cards -> compare new five cards
+      return compareFiveCardCombinations(cards, lastPlayed);
     }
+
+    return false;
   };
 
   /**
@@ -303,7 +423,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // If we just played doubles, or single
     setIsDoublesRound(selectedCards.length === 2);
+    setIsFiveCardRound(selectedCards.length === 5);
     setLastMoveWasDouble(selectedCards.length === 2);
+    setLastMoveWasFiveCard(selectedCards.length === 5);
 
     // Reset selection
     setSelectedCards([]);
@@ -329,6 +451,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       // Switch turn
       setCurrentPlayer(currentPlayer === "player" ? "computer" : "player");
       setIsDoublesRound(false); // new round
+      setIsFiveCardRound(false); // new round
       setRoundReset(true); // any move is valid next
     }
   };
@@ -353,7 +476,72 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       return false;
     };
 
-    // Single or double from *last move*.
+    // Handle 5-card round
+    if (lastMoveWasFiveCard && !roundReset) {
+      // Find all possible 5-card combinations
+      const possibleCombinations: CardType[][] = [];
+      
+      // Find triple + 2 combinations
+      const valueCounts: Record<string, CardType[]> = {};
+      computerHand.forEach(card => {
+        if (!valueCounts[card.value]) {
+          valueCounts[card.value] = [];
+        }
+        valueCounts[card.value].push(card);
+      });
+      
+      // Find all triples
+      Object.entries(valueCounts).forEach(([value, cards]) => {
+        if (cards.length >= 3) {
+          // Get all possible combinations of 3 cards from this value
+          for (let i = 0; i < cards.length - 2; i++) {
+            for (let j = i + 1; j < cards.length - 1; j++) {
+              for (let k = j + 1; k < cards.length; k++) {
+                const triple = [cards[i], cards[j], cards[k]];
+                // Add any 2 other cards to complete the 5-card combination
+                const remainingCards = computerHand.filter(c => !triple.includes(c));
+                for (let l = 0; l < remainingCards.length - 1; l++) {
+                  for (let m = l + 1; m < remainingCards.length; m++) {
+                    possibleCombinations.push([...triple, remainingCards[l], remainingCards[m]]);
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Find all possible straights
+      const sortedHand = [...computerHand].sort((a, b) => cardValues[a.value] - cardValues[b.value]);
+      for (let i = 0; i <= sortedHand.length - 5; i++) {
+        const potentialStraight = sortedHand.slice(i, i + 5);
+        if (isValidStraight(potentialStraight)) {
+          possibleCombinations.push(potentialStraight);
+        }
+      }
+      
+      // Find a valid combination that beats the last play
+      for (const combination of possibleCombinations) {
+        if (isValidMove(combination)) {
+          setComputerHand((prev) => prev.filter((c) => !combination.includes(c)));
+          setPlayArea((prev) => [...prev, ...combination]);
+          setGameMessage(
+            `Computer played 5 cards. Player's turn.`
+          );
+          setCurrentPlayer("player");
+          setIsFiveCardRound(true);
+          setLastMoveWasFiveCard(true);
+          setRoundReset(false);
+          return;
+        }
+      }
+      
+      // No valid 5-card combination found => draw
+      drawCard();
+      return;
+    }
+
+    // Handle doubles round
     if (lastMoveWasDouble && !roundReset) {
       // Attempt to play a higher double
       const [lc1] = lastPlayed; // both have same rank
@@ -374,7 +562,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
               );
               setCurrentPlayer("player");
               setIsDoublesRound(true);
+              setIsFiveCardRound(false);
               setLastMoveWasDouble(true);
+              setLastMoveWasFiveCard(false);
               setRoundReset(false);
               return;
             }
@@ -384,43 +574,45 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       // No valid pair found => draw
       drawCard();
       return;
+    }
+
+    // Handle single card or round reset
+    // If roundReset = true, any single is valid, so pick the lowest or random card
+    let playableCards: CardType[];
+
+    if (roundReset || lastPlayed.length === 0) {
+      // Round reset or no cards => any single is valid
+      playableCards = computerHand;
     } else {
-      // Single scenario or round reset
-      // If roundReset = true, any single is valid, so pick the lowest or random card
-      let playableCards: CardType[];
+      // Must beat the last single card
+      const lastCard = lastPlayed[0];
+      playableCards = computerHand.filter((c) => isCardHigher(c, lastCard));
+    }
 
-      if (roundReset || lastPlayed.length === 0) {
-        // Round reset or no cards => any single is valid
-        playableCards = computerHand;
-      } else {
-        // Must beat the last single card
-        const lastCard = lastPlayed[0];
-        playableCards = computerHand.filter((c) => isCardHigher(c, lastCard));
-      }
+    if (playableCards.length > 0) {
+      // Let's pick the *lowest* valid card to keep AI somewhat "logical"
+      // e.g. sorted ascending by rank/suit
+      playableCards.sort((a, b) => {
+        const valDiff = cardValues[a.value] - cardValues[b.value];
+        if (valDiff !== 0) return valDiff;
+        return suitValues[a.suit] - suitValues[b.suit];
+      });
 
-      if (playableCards.length > 0) {
-        // Let's pick the *lowest* valid card to keep AI somewhat “logical”
-        // e.g. sorted ascending by rank/suit
-        playableCards.sort((a, b) => {
-          const valDiff = cardValues[a.value] - cardValues[b.value];
-          if (valDiff !== 0) return valDiff;
-          return suitValues[a.suit] - suitValues[b.suit];
-        });
-
-        const chosen = playableCards[0];
-        setComputerHand((prev) => prev.filter((c) => c.id !== chosen.id));
-        setPlayArea((prev) => [...prev, chosen]);
-        setGameMessage(
-          `Computer played ${chosen.value}${chosen.suit}. Player's turn.`
-        );
-        setCurrentPlayer("player");
-        setIsDoublesRound(false);
-        setLastMoveWasDouble(false);
-        setRoundReset(false);
-      } else {
-        // No valid single => draw
-        drawCard();
-      }
+      const chosen = playableCards[0];
+      setComputerHand((prev) => prev.filter((c) => c.id !== chosen.id));
+      setPlayArea((prev) => [...prev, chosen]);
+      setGameMessage(
+        `Computer played ${chosen.value}${chosen.suit}. Player's turn.`
+      );
+      setCurrentPlayer("player");
+      setIsDoublesRound(false);
+      setIsFiveCardRound(false);
+      setLastMoveWasDouble(false);
+      setLastMoveWasFiveCard(false);
+      setRoundReset(false);
+    } else {
+      // No valid single => draw
+      drawCard();
     }
   };
 
@@ -462,6 +654,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         playerWins,
         computerWins,
         isDoublesRound,
+        isFiveCardRound,
         selectCard,
         deselectCard,
         playSelectedCards,
