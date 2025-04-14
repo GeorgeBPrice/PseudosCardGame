@@ -81,6 +81,7 @@ interface HandProps {
   onDeselectCard: (card: CardType) => void;
   selectedCards: CardType[];
   disabled: boolean;
+  isFiveCardRound: boolean;
 }
 
 const Hand: React.FC<HandProps> = ({
@@ -89,6 +90,7 @@ const Hand: React.FC<HandProps> = ({
   onDeselectCard,
   selectedCards,
   disabled,
+  isFiveCardRound,
 }) => {
   const [, drop] = useDrop(() => ({
     accept: "card",
@@ -132,7 +134,7 @@ const Hand: React.FC<HandProps> = ({
             onSelectCard={onSelectCard}
             disabled={
               disabled ||
-              (selectedCards.length === 2 &&
+              (selectedCards.length === 5 &&
                 !selectedCards.some((c) => c.id === card.id))
             }
             isSelected={selectedCards.some((c) => c.id === card.id)}

@@ -18,11 +18,16 @@ import Hand from "./Hand";
 import Deck from "./Deck";
 import PlayArea from "./PlayArea";
 import ComputerHand from "./ComputerHand";
-import { useGameContext, GameProvider, CardType } from "./contexts/GameContext";
+import {
+  useGameContext,
+  GameProvider,
+  CardType,
+  isValidStraight,
+} from "./contexts/GameContext";
 import Confetti from "react-confetti";
 
 /**
- * A Dialog component that shows the game’s rules
+ * A Dialog component that shows the game's rules
  * in a scrollable, user-friendly format.
  */
 function RulesDialog({
@@ -80,6 +85,7 @@ function RulesDialog({
 const GameContent: React.FC = () => {
   // State for controlling the visibility of the Rules dialog
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const {
     playerHand,
@@ -93,6 +99,7 @@ const GameContent: React.FC = () => {
     playerWins,
     computerWins,
     isDoublesRound,
+    isFiveCardRound,
     selectCard,
     deselectCard,
     playSelectedCards,
@@ -113,9 +120,35 @@ const GameContent: React.FC = () => {
 
   const handlePlayCard = (card: CardType) => {
     selectCard(card);
-    if (selectedCards.length === 1 || isDoublesRound) {
-      playSelectedCards();
+  };
+
+  const handlePlaySelectedCards = () => {
+    // Validate the selected cards before playing
+    if (
+      selectedCards.length === 2 &&
+      selectedCards[0].value !== selectedCards[1].value
+    ) {
+      setErrorMessage("Doubles must be of the same value (e.g., 7 and 7)");
+      return;
     }
+
+    if (selectedCards.length === 5) {
+      const isTriplePlusTwo = selectedCards.some(
+        (card) =>
+          selectedCards.filter((c) => c.value === card.value).length === 3
+      );
+      const isStraight = isValidStraight(selectedCards);
+
+      if (!isTriplePlusTwo && !isStraight) {
+        setErrorMessage(
+          "5 cards must be either a straight or three of a kind plus two random cards"
+        );
+        return;
+      }
+    }
+
+    setErrorMessage("");
+    playSelectedCards();
   };
 
   // If both player and computer have 0 cards, game hasn't started yet
@@ -169,7 +202,7 @@ const GameContent: React.FC = () => {
       <Card
         sx={{
           width: "100%",
-          maxWidth: "1300px",
+          maxWidth: "1200px",
           mx: "auto",
           my: 4,
           position: "relative",
@@ -235,6 +268,7 @@ const GameContent: React.FC = () => {
                 onDeselectCard={deselectCard}
                 onPlayCard={handlePlayCard}
                 isDoublesRound={isDoublesRound}
+                isFiveCardRound={isFiveCardRound}
               />
               <Hand
                 cards={playerHand}
@@ -242,6 +276,7 @@ const GameContent: React.FC = () => {
                 onDeselectCard={deselectCard}
                 selectedCards={selectedCards}
                 disabled={currentPlayer !== "player" || winner !== null}
+                isFiveCardRound={isFiveCardRound}
               />
             </Box>
 
@@ -290,15 +325,30 @@ const GameContent: React.FC = () => {
 
               <Button
                 variant="contained"
-                onClick={playSelectedCards}
+                onClick={handlePlaySelectedCards}
                 disabled={
                   currentPlayer !== "player" ||
                   selectedCards.length === 0 ||
+                  selectedCards.length === 3 ||
+                  selectedCards.length === 4 ||
                   winner !== null
                 }
               >
-                Play Card{selectedCards.length === 2 ? "s" : ""}
+                Play Card
+                {selectedCards.length === 2
+                  ? "s (2)"
+                  : selectedCards.length > 2 && selectedCards.length < 5
+                  ? "s (?)"
+                  : selectedCards.length === 5
+                  ? "s (5)"
+                  : ""}
               </Button>
+
+              {errorMessage && (
+                <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                  {errorMessage}
+                </Typography>
+              )}
 
               <Typography variant="subtitle1" fontWeight="bold">
                 Current Player: {currentPlayer}
@@ -314,7 +364,6 @@ const GameContent: React.FC = () => {
                 </Typography>
               </Box>
 
-              {/* Show Rules button on the right column as well */}
               <Button
                 variant="outlined"
                 color="primary"

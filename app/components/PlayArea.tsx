@@ -9,6 +9,7 @@ interface PlayAreaProps {
   onDeselectCard: (card: CardType) => void;
   onPlayCard: (card: CardType) => void;
   isDoublesRound: boolean;
+  isFiveCardRound: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   onDeselectCard,
   onPlayCard,
   isDoublesRound,
+  isFiveCardRound,
 }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "card",
@@ -70,6 +72,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
         <Typography variant="h6" fontWeight="bold" gutterBottom>
           {playedCards.length === 0 ? "Play a Card" : "Cards in Play"}{" "}
           {isDoublesRound && "(Doubles Round)"}
+          {isFiveCardRound && "(Five Card Round)"}
         </Typography>
 
         <div
@@ -81,7 +84,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
             gap: "0.5rem",
           }}
         >
-          {playedCards.slice(-2).map((card, index) => {
+          {playedCards.slice(-5).map((card, index) => {
             const color =
               card.suit === "♥" || card.suit === "♦" ? "red" : "black";
             return (
