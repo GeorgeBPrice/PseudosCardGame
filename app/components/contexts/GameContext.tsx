@@ -1,10 +1,48 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+/**
+ * @fileoverview Game Context Provider and Hook for Pusoy Dos card game
+ * 
+ * This file defines the React Context and Provider for managing the game state and logic
+ * for a Pusoy Dos card game. It includes:
+ * 
+ * - GameContext: React Context containing game state and actions
+ * - useGameContext: Custom hook to access the game context
+ * - GameContextType: TypeScript interface defining the shape of the context
+ * 
+ * The context manages:
+ * - Player and computer hands
+ * - Play area (currently played cards)
+ * - Selected cards for playing
+ * - Turn management (player vs computer)
+ * - Game status (current player, winner, game messages)
+ * - Game statistics (wins)
+ * - Game modes (doubles round, five card round)
+ * - Game actions (select/play cards, draw cards, computer AI)
+ * 
+ * @requires React
+ * @requires GameRules
+ * 
+ * @exports GameContext
+ * @exports useGameContext
+ * @exports GameContextType
+ * @exports CardType
+ * @exports isValidStraight
+ */
 
-export interface CardType {
-  id: number;
-  value: string;
-  suit: string;
-}
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+import {
+  CardType,
+  cardValues,
+  suitValues,
+  isValidStraight,
+  isValidTriplePlusTwo,
+  compareFiveCardCombinations,
+  isValidMove,
+  getHighestSuitInStraight
+} from "./GameRules";
+
+export type { CardType };
+export { isValidStraight };
 
 interface GameContextType {
   playerHand: CardType[];
@@ -47,66 +85,6 @@ export const useGameContext = () => {
   return context;
 };
 
-// Ranks: 2 (2) ... 10 (10), J(11), Q(12), K(13), A(14)
-const cardValues: Record<string, number> = {
-  "2": 2,
-  "3": 3,
-  "4": 4,
-  "5": 5,
-  "6": 6,
-  "7": 7,
-  "8": 8,
-  "9": 9,
-  "10": 10,
-  J: 11,
-  Q: 12,
-  K: 13,
-  A: 14,
-};
-
-// Suits: ♠(1) < ♣(2) < ♦(3) < ♥(4)  (lowest to highest)
-const suitValues: Record<string, number> = {
-  "♠": 1,
-  "♣": 2,
-  "♦": 3,
-  "♥": 4,
-};
-
-/**
- * Check if the given 5 cards form a valid straight
- * Aces are always high in straights (10,J,Q,K,A)
- */
-export const isValidStraight = (cards: CardType[]): boolean => {
-  if (cards.length !== 5) return false;
-  
-  // Sort cards by value, treating Aces as highest
-  const sortedCards = [...cards].sort((a, b) => {
-    const aValue = a.value === 'A' ? 14 : cardValues[a.value];
-    const bValue = b.value === 'A' ? 14 : cardValues[b.value];
-    return aValue - bValue;
-  });
-  
-  // Special case for A-high straight (10,J,Q,K,A)
-  if (sortedCards[0].value === '10' && 
-      sortedCards[1].value === 'J' && 
-      sortedCards[2].value === 'Q' && 
-      sortedCards[3].value === 'K' && 
-      sortedCards[4].value === 'A') {
-    return true;
-  }
-  
-  // Check if values are consecutive
-  for (let i = 1; i < sortedCards.length; i++) {
-    const prevValue = sortedCards[i-1].value === 'A' ? 14 : cardValues[sortedCards[i-1].value];
-    const currValue = sortedCards[i].value === 'A' ? 14 : cardValues[sortedCards[i].value];
-    if (currValue !== prevValue + 1) {
-      return false;
-    }
-  }
-  
-  return true;
-};
-
 let deck: CardType[] = [];
 
 /**
@@ -146,6 +124,11 @@ function shuffleDeck(deck: CardType[]) {
   return deck;
 }
 
+/**
+ * Compare two 5-card combinations to determine if the new one beats the last one
+ */
+
+
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -173,8 +156,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 9);
-    const initialComputerHand = deck.splice(0, 9);
+    const initialPlayerHand = deck.splice(0, 14);
+    const initialComputerHand = deck.splice(0, 14);
 
     setPlayerHand(initialPlayerHand);
     setComputerHand(initialComputerHand);
@@ -231,73 +214,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     // Otherwise single: just last card
     return playArea.slice(-1);
-  };
-
-  /**
-   * Check if the given 5 cards form a valid triple + 2 random cards combination
-   */
-  const isValidTriplePlusTwo = (cards: CardType[]): boolean => {
-    if (cards.length !== 5) return false;
-    
-    // Count occurrences of each value
-    const valueCounts: Record<string, number> = {};
-    cards.forEach(card => {
-      valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
-    });
-    
-    // Check if there's a value that appears 3 times
-    return Object.values(valueCounts).some(count => count === 3);
-  };
-
-  /**
-   * Get the highest suit in a straight for tie-breaking
-   */
-  const getHighestSuitInStraight = (cards: CardType[]): number => {
-    // Sort cards by value and suit
-    const sortedCards = [...cards].sort((a, b) => {
-      const aValue = a.value === 'A' ? 14 : cardValues[a.value];
-      const bValue = b.value === 'A' ? 14 : cardValues[b.value];
-      if (aValue !== bValue) return bValue - aValue;
-      return suitValues[b.suit] - suitValues[a.suit];
-    });
-    
-    return suitValues[sortedCards[0].suit];
-  };
-
-  /**
-   * Compare two 5-card combinations to determine if the new one beats the last one
-   */
-  const compareFiveCardCombinations = (newCards: CardType[], lastCards: CardType[]): boolean => {
-    const isNewStraight = isValidStraight(newCards);
-    const isLastStraight = isValidStraight(lastCards);
-    
-    // Straight always beats triple + 2
-    if (isNewStraight && !isLastStraight) return true;
-    if (!isNewStraight && isLastStraight) return false;
-    
-    if (isNewStraight && isLastStraight) {
-      // Compare highest card in straights
-      const newHighest = Math.max(...newCards.map(c => c.value === 'A' ? 14 : cardValues[c.value]));
-      const lastHighest = Math.max(...lastCards.map(c => c.value === 'A' ? 14 : cardValues[c.value]));
-      
-      if (newHighest > lastHighest) return true;
-      if (newHighest < lastHighest) return false;
-      
-      // If highest cards are equal, compare suits
-      return getHighestSuitInStraight(newCards) > getHighestSuitInStraight(lastCards);
-    }
-    
-    // Both are triple + 2, compare the triple value
-    const getTripleValue = (cards: CardType[]): number => {
-      const valueCounts: Record<string, number> = {};
-      cards.forEach(card => {
-        valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
-      });
-      const tripleValue = Object.entries(valueCounts).find(([_, count]) => count === 3)?.[0];
-      return tripleValue ? (tripleValue === 'A' ? 14 : cardValues[tripleValue]) : 0;
-    };
-    
-    return getTripleValue(newCards) > getTripleValue(lastCards);
   };
 
   /**
@@ -372,6 +288,32 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       return false;
     } else if (lastPlayed.length === 5) {
       // Five cards -> compare new five cards
+      const isLastStraight = isValidStraight(lastPlayed);
+      const isNewStraight = isValidStraight(cards);
+      
+      // If last play was a straight, new play must be a higher straight
+      if (isLastStraight && !isNewStraight) return false;
+      
+      // If last play was triple + 2, new play must be either:
+      // 1. A straight (which always wins)
+      // 2. A higher triple + 2
+      if (!isLastStraight && !isNewStraight) {
+        const getTripleValue = (cards: CardType[]): number => {
+          const valueCounts: Record<string, number> = {};
+          cards.forEach(card => {
+            valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
+          });
+          const tripleValue = Object.entries(valueCounts).find(([_, count]) => count === 3)?.[0];
+          return tripleValue ? (tripleValue === 'A' ? 14 : cardValues[tripleValue]) : 0;
+        };
+        
+        const lastTripleValue = getTripleValue(lastPlayed);
+        const newTripleValue = getTripleValue(cards);
+        
+        return newTripleValue > lastTripleValue;
+      }
+      
+      // If we get here, it means we're comparing straights
       return compareFiveCardCombinations(cards, lastPlayed);
     }
 
