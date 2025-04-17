@@ -1,7 +1,8 @@
 import React, { useRef } from "react";
 import { useDrop } from "react-dnd";
-import { Card as MUICard, CardContent, Typography } from "@mui/material";
+import { Card as MUICard, CardContent, Typography, Box } from "@mui/material";
 import { CardType } from "./contexts/GameContext";
+import { isValidStraight, isValidTriplePlusTwo } from "./contexts/GameRules";
 
 interface PlayAreaProps {
   playedCards: CardType[];
@@ -10,6 +11,8 @@ interface PlayAreaProps {
   onPlayCard: (card: CardType) => void;
   isDoublesRound: boolean;
   isFiveCardRound: boolean;
+  currentPlayer: "player" | "computer";
+  gameMessage: string;
 }
 
 /**
@@ -26,6 +29,8 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   onPlayCard,
   isDoublesRound,
   isFiveCardRound,
+  currentPlayer,
+  gameMessage,
 }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "card",
@@ -38,6 +43,50 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   }));
 
   const divRef = useRef<HTMLDivElement>(null);
+
+  // Function to format a card for display
+  const formatCard = (card: CardType) => `${card.value}${card.suit}`;
+
+  // Function to get the last move cards
+  const getLastMoveCards = () => {
+    if (playedCards.length === 0) return [];
+    
+    // Get the last move based on the number of cards
+    const lastMoveLength = playedCards.length;
+    
+    // Check if the last 5 cards form a valid 5-card combination
+    if (lastMoveLength >= 5) {
+      const lastFive = playedCards.slice(-5);
+      if (isValidStraight(lastFive) || isValidTriplePlusTwo(lastFive)) {
+        return lastFive;
+      }
+    }
+    
+    // Check if the last 2 cards are a pair
+    if (lastMoveLength >= 2) {
+      const lastTwo = playedCards.slice(-2);
+      if (lastTwo[0].value === lastTwo[1].value) {
+        return lastTwo;
+      }
+    }
+    
+    // Default to showing the last single card
+    return playedCards.slice(-1);
+  };
+
+  // Function to get the breadcrumb items
+  const getBreadcrumbItems = () => {
+    const items: string[] = [];
+    let i = 0;
+    
+    while (i < playedCards.length) {
+      // Always treat each card as a separate move
+      items.push(formatCard(playedCards[i]));
+      i += 1;
+    }
+    
+    return items;
+  };
 
   return (
     <MUICard
@@ -52,6 +101,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
         border: "2px solid",
         borderStyle: "dashed",
         borderColor: "#bbbeff",
+        position: "relative",
       }}
     >
       <CardContent
@@ -69,56 +119,184 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           overflowY: "auto",
         }}
       >
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          {playedCards.length === 0 ? "Play a Card" : "Cards in Play"}{" "}
-          {isDoublesRound && "(Doubles Round)"}
-          {isFiveCardRound && "(Five Card Round)"}
-        </Typography>
-
-        <div
-          style={{
+        {/* Breadcrumb for previous moves */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: "1rem",
+            left: "1rem",
+            width: "70%",
+            maxHeight: "3rem",
+            overflow: "hidden",
             display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
             alignItems: "center",
-            gap: "0.5rem",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "2rem",
+              height: "100%",
+              background: "linear-gradient(to right, rgba(253, 249, 255, 1), rgba(253, 249, 255, 0))",
+              zIndex: 1,
+            },
           }}
         >
-          {playedCards.slice(-5).map((card, index) => {
-            const color =
-              card.suit === "♥" || card.suit === "♦" ? "red" : "black";
-            return (
-              <MUICard
-                key={card.id}
+          <Box
+            sx={{
+              display: "flex",
+              gap: "0.5rem",
+              alignItems: "center",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": {
+                display: "none",
+              },
+              paddingLeft: "2rem",
+              width: "100%",
+              justifyContent: "flex-end",
+            }}
+          >
+            {getBreadcrumbItems().map((item, index) => (
+              <Box
+                key={index}
                 sx={{
-                  width: { xs: 64, sm: 80 },
-                  height: { xs: 96, sm: 112 },
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  border: "2px solid",
-                  borderColor: index % 2 === 0 ? "blue" : "red",
+                  flexShrink: 0,
+                  "&:not(:last-child)::after": {
+                    content: '">"',
+                    margin: "0 0.5rem",
+                    color: "#666",
+                  },
                 }}
               >
-                <CardContent sx={{ p: 0, textAlign: "center" }}>
-                  <Typography variant="h6" fontWeight="bold" sx={{ color }}>
-                    {card.value}
-                    {card.suit}
-                  </Typography>
-                </CardContent>
-              </MUICard>
-            );
-          })}
-        </div>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    color: "#666",
+                    fontSize: "1.1rem",
+                    "& .suit": {
+                      fontSize: "1.3rem",
+                      verticalAlign: "middle",
+                    },
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html: item.replace(/([♠♣♦♥])/, '<span class="suit">$1</span>')
+                  }}
+                />
+              </Box>
+            ))}
+          </Box>
+        </Box>
 
-        {/* Display currently selected cards (the ones about to be played) */}
+        {/* Game message in top right */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: "1rem",
+            right: "1rem",
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            padding: "0.5rem 1rem",
+            borderRadius: "0.5rem",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="body2">
+            {gameMessage.replace("Player's turn.", "").replace("Computer's turn.", "")}
+          </Typography>
+        </Box>
+
+        {/* Turn indicator in bottom right */}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: "1rem",
+            right: "1rem",
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            padding: "0.5rem 1rem",
+            borderRadius: "0.5rem",
+            boxShadow: 1,
+          }}
+        >
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              color: currentPlayer === "player" ? "#4e54c8" : "inherit",
+              fontWeight: currentPlayer === "player" ? "bold" : "normal"
+            }}
+          >
+            Turn: {currentPlayer === "player" ? "Yours" : "Computer"}
+          </Typography>
+        </Box>
+
+        {/* Last move cards */}
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem",
+          }}
+        >
+          {isFiveCardRound && (
+            <Typography variant="h6" color="primary" fontWeight="bold">
+              Five Card Hand
+            </Typography>
+          )}
+          {isDoublesRound && (
+            <Typography variant="h6" color="primary" fontWeight="bold">
+              Doubles
+            </Typography>
+          )}
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            {getLastMoveCards().map((card) => {
+              const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+              return (
+                <MUICard
+                  key={card.id}
+                  sx={{
+                    width: { xs: 64, sm: 80 },
+                    height: { xs: 96, sm: 112 },
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px solid",
+                    borderColor: "blue",
+                    transition: "transform 0.3s",
+                    "&:hover": {
+                      transform: "translateY(-4px)",
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 0, textAlign: "center" }}>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color }}>
+                      {card.value}
+                      {card.suit}
+                    </Typography>
+                  </CardContent>
+                </MUICard>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Display currently selected cards */}
         {selectedCards.length > 0 && (
-          <div style={{ marginTop: "1rem", textAlign: "center" }}>
+          <Box sx={{ marginTop: "2rem", textAlign: "center" }}>
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
               You are playing:
             </Typography>
-            <div
-              style={{
+            <Box
+              sx={{
                 display: "flex",
                 flexWrap: "wrap",
                 justifyContent: "center",
@@ -127,8 +305,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
               }}
             >
               {selectedCards.map((card) => {
-                const color =
-                  card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+                const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
                 return (
                   <MUICard
                     key={card.id}
@@ -157,8 +334,8 @@ const PlayArea: React.FC<PlayAreaProps> = ({
                   </MUICard>
                 );
               })}
-            </div>
-          </div>
+            </Box>
+          </Box>
         )}
       </CardContent>
     </MUICard>

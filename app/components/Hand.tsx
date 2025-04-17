@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { Card as MUICard, CardContent, Typography } from "@mui/material";
+import { Card as MUICard, CardContent, Typography, Box } from "@mui/material";
 import { CardType } from "./contexts/GameContext";
 
 interface CardProps {
@@ -8,6 +8,7 @@ interface CardProps {
   onSelectCard: (card: CardType) => void;
   disabled: boolean;
   isSelected: boolean;
+  isPlayerTurn: boolean;
 }
 
 /**
@@ -82,6 +83,7 @@ interface HandProps {
   selectedCards: CardType[];
   disabled: boolean;
   isFiveCardRound: boolean;
+  isPlayerTurn: boolean;
 }
 
 const Hand: React.FC<HandProps> = ({
@@ -91,6 +93,7 @@ const Hand: React.FC<HandProps> = ({
   selectedCards,
   disabled,
   isFiveCardRound,
+  isPlayerTurn,
 }) => {
   const [, drop] = useDrop(() => ({
     accept: "card",
@@ -108,18 +111,38 @@ const Hand: React.FC<HandProps> = ({
   const handRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div
-      ref={(node) => {
-        handRef;
-        drop(node);
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "1rem",
+        padding: "1rem",
+        border: "2px solid",
+        borderColor: isPlayerTurn ? "#90EE90" : "rgba(0, 0, 0, 0.12)",
+        borderRadius: "1rem",
+        backgroundColor: isPlayerTurn ? "rgba(144, 238, 144, 0.1)" : "transparent",
+        transition: "all 0.3s",
+        animation: isPlayerTurn ? "shake 0.5s" : "none",
+        "@keyframes shake": {
+          "0%": { transform: "translateX(0)" },
+          "25%": { transform: "translateX(-1px)" },
+          "50%": { transform: "translateX(1px)" },
+          "75%": { transform: "translateX(-1px)" },
+          "100%": { transform: "translateX(0)" },
+        },
       }}
-      style={{ marginTop: "1rem" }}
     >
-      <Typography variant="h6" fontWeight="bold" gutterBottom>
+      <Typography 
+        variant="h6" 
+        fontWeight="bold" 
+        color={"inherit"}
+        sx={{ alignSelf: "flex-start" }}
+      >
         Your Hand
       </Typography>
-      <div
-        style={{
+      <Box
+        sx={{
           display: "flex",
           flexWrap: "wrap",
           justifyContent: "center",
@@ -132,16 +155,13 @@ const Hand: React.FC<HandProps> = ({
             key={card.id}
             card={card}
             onSelectCard={onSelectCard}
-            disabled={
-              disabled ||
-              (selectedCards.length === 5 &&
-                !selectedCards.some((c) => c.id === card.id))
-            }
-            isSelected={selectedCards.some((c) => c.id === card.id)}
+            disabled={disabled}
+            isSelected={selectedCards.includes(card)}
+            isPlayerTurn={isPlayerTurn}
           />
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
 

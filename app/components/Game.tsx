@@ -202,7 +202,7 @@ const GameContent: React.FC = () => {
       <Card
         sx={{
           width: "100%",
-          maxWidth: "1200px",
+          maxWidth: "100%",
           mx: "auto",
           my: 4,
           position: "relative",
@@ -269,6 +269,8 @@ const GameContent: React.FC = () => {
                 onPlayCard={handlePlayCard}
                 isDoublesRound={isDoublesRound}
                 isFiveCardRound={isFiveCardRound}
+                currentPlayer={currentPlayer}
+                gameMessage={gameMessage}
               />
               <Hand
                 cards={playerHand}
@@ -277,6 +279,7 @@ const GameContent: React.FC = () => {
                 selectedCards={selectedCards}
                 disabled={currentPlayer !== "player" || winner !== null}
                 isFiveCardRound={isFiveCardRound}
+                isPlayerTurn={currentPlayer === "player"}
               />
             </Box>
 
