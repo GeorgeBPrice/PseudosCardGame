@@ -47,45 +47,59 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   // Function to format a card for display
   const formatCard = (card: CardType) => `${card.value}${card.suit}`;
 
-  // Function to get the last move cards
-  const getLastMoveCards = () => {
+  // Function to get the last hand played
+  const getLastHand = () => {
     if (playedCards.length === 0) return [];
     
-    // Get the last move based on the number of cards
-    const lastMoveLength = playedCards.length;
+    // Start from the end and work backwards to find the last complete hand
+    let i = playedCards.length - 1;
     
-    // Check if the last 5 cards form a valid 5-card combination
-    if (lastMoveLength >= 5) {
-      const lastFive = playedCards.slice(-5);
-      if (isValidStraight(lastFive) || isValidTriplePlusTwo(lastFive)) {
-        return lastFive;
-      }
+    // If it's a five card round, return the last 5 cards
+    if (isFiveCardRound && i >= 4) {
+      return playedCards.slice(i - 4, i + 1);
     }
     
-    // Check if the last 2 cards are a pair
-    if (lastMoveLength >= 2) {
-      const lastTwo = playedCards.slice(-2);
-      if (lastTwo[0].value === lastTwo[1].value) {
-        return lastTwo;
-      }
+    // If it's a doubles round, return the last 2 cards
+    if (isDoublesRound && i >= 1) {
+      return playedCards.slice(i - 1, i + 1);
     }
     
-    // Default to showing the last single card
-    return playedCards.slice(-1);
+    // If it's a single card round, return the last card
+    return [playedCards[i]];
   };
 
-  // Function to get the breadcrumb items
-  const getBreadcrumbItems = () => {
-    const items: string[] = [];
+  // Function to get the history of hands played
+  const getHandHistory = () => {
+    const history: { cards: CardType[], type: 'single' | 'double' | 'five' }[] = [];
     let i = 0;
     
     while (i < playedCards.length) {
-      // Always treat each card as a separate move
-      items.push(formatCard(playedCards[i]));
+      // Check for 5-card hand
+      if (i + 5 <= playedCards.length) {
+        const potentialFive = playedCards.slice(i, i + 5);
+        if (isValidStraight(potentialFive) || isValidTriplePlusTwo(potentialFive)) {
+          history.push({ cards: potentialFive, type: 'five' });
+          i += 5;
+          continue;
+        }
+      }
+      
+      // Check for double
+      if (i + 2 <= playedCards.length) {
+        const potentialDouble = playedCards.slice(i, i + 2);
+        if (potentialDouble[0].value === potentialDouble[1].value) {
+          history.push({ cards: potentialDouble, type: 'double' });
+          i += 2;
+          continue;
+        }
+      }
+      
+      // Default to single
+      history.push({ cards: [playedCards[i]], type: 'single' });
       i += 1;
     }
     
-    return items;
+    return history;
   };
 
   return (
@@ -119,14 +133,14 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           overflowY: "auto",
         }}
       >
-        {/* Breadcrumb for previous moves */}
+        {/* Breadcrumb for previous hands */}
         <Box
           sx={{
             position: "absolute",
-            top: "1rem",
+            top: "0.5rem",
             left: "1rem",
             width: "70%",
-            maxHeight: "3rem",
+            maxHeight: "2rem",
             overflow: "hidden",
             display: "flex",
             alignItems: "center",
@@ -145,7 +159,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           <Box
             sx={{
               display: "flex",
-              gap: "0.5rem",
+              gap: "0.25rem",
               alignItems: "center",
               overflowX: "auto",
               scrollbarWidth: "none",
@@ -154,38 +168,41 @@ const PlayArea: React.FC<PlayAreaProps> = ({
               },
               paddingLeft: "2rem",
               width: "100%",
-              justifyContent: "flex-end",
+              justifyContent: "flex-start",
             }}
           >
-            {getBreadcrumbItems().map((item, index) => (
-              <Box
-                key={index}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  flexShrink: 0,
-                  "&:not(:last-child)::after": {
-                    content: '">"',
-                    margin: "0 0.5rem",
-                    color: "#666",
-                  },
-                }}
-              >
+            {playedCards.slice(-15).map((card, index, array) => (
+              <React.Fragment key={index}>
                 <Typography
                   variant="body1"
                   sx={{
                     color: "#666",
-                    fontSize: "1.1rem",
+                    fontSize: "0.9rem",
                     "& .suit": {
-                      fontSize: "1.3rem",
+                      fontSize: "1.1rem",
                       verticalAlign: "middle",
                     },
                   }}
                   dangerouslySetInnerHTML={{
-                    __html: item.replace(/([♠♣♦♥])/, '<span class="suit">$1</span>')
+                    __html: formatCard(card).replace(/([♠♣♦♥])/g, '<span class="suit">$1</span>')
                   }}
                 />
-              </Box>
+                {index < array.length - 1 && (
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      color: "#666",
+                      fontSize: "0.9rem",
+                      display: "flex",
+                      alignItems: "center",
+                      "&::before": {
+                        content: '"•"',
+                        margin: "0 0.1rem",
+                      },
+                    }}
+                  />
+                )}
+              </React.Fragment>
             ))}
           </Box>
         </Box>
@@ -230,7 +247,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           </Typography>
         </Box>
 
-        {/* Last move cards */}
+        {/* Last hand played */}
         <Box
           sx={{
             display: "flex",
@@ -258,7 +275,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
               gap: "0.5rem",
             }}
           >
-            {getLastMoveCards().map((card) => {
+            {getLastHand().map((card) => {
               const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
               return (
                 <MUICard

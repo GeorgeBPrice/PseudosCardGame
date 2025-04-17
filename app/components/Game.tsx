@@ -356,8 +356,6 @@ const GameContent: React.FC = () => {
               <Typography variant="subtitle1" fontWeight="bold">
                 Current Player: {currentPlayer}
               </Typography>
-              <Typography variant="body2">{gameMessage}</Typography>
-
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <Typography variant="body1">
                   Player Wins: {playerWins}
