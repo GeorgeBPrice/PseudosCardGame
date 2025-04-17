@@ -39,32 +39,36 @@ function RulesDialog({
 }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Pusoy Dos Variant – Rules</DialogTitle>
+      <DialogTitle>PseuDos – Rules</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body1" paragraph>
-          <strong>Objective:</strong> Be the first player to shed all your
-          cards.
+          <strong>Objective:</strong> Be the first player to shed all your cards.
         </Typography>
+
+        <Typography variant="h6" gutterBottom>Card Play Types:</Typography>
+        
         <Typography variant="body1" paragraph>
-          <strong>Gameplay:</strong> Players take turns playing one card,
-          doubles, or a hand of 5 to beat the previous play. If a player
-          cannot—or chooses not to—beat the previous play, they must draw a
-          card. The player who wins the round can start the next round with any
-          allowed card combination.
+          <strong>Single Card:</strong> Play one card to beat the previous play. Higher value wins, and if values are equal, higher suit wins (&spades; &lt; &clubs; &lt; &diams; &lt; &hearts;).
         </Typography>
+
         <Typography variant="body1" paragraph>
-          <strong>Deck and Suit Values:</strong> This game uses a standard
-          52-card deck. Suits ascend in the order: ♠ (lowest), ♣, ♦, ♥
-          (highest). Card ranks ascend 2, 3, 4... 10, J, Q, K, A.
+          <strong>Doubles:</strong> Play two cards of the same value (e.g., 7&spades; & 7&diams;). The higher value pair wins. If values are equal, the higher suit of the highest card wins.
         </Typography>
+
         <Typography variant="body1" paragraph>
-          <strong>Winning a Round:</strong> A round is won when your opponent
-          cannot beat your play. You then start the next round with any card
-          combination you want.
+          <strong>5-Card Half Suit:</strong> Play five cards of the same suit in sequence (e.g., 3&hearts;, 4&hearts;, 5&hearts;, 6&hearts;, 7&hearts;). The highest card in the sequence determines the strength.
         </Typography>
+
         <Typography variant="body1" paragraph>
-          <strong>Winning the Game:</strong> The first player to shed all of
-          their cards is immediately declared the winner.
+          <strong>5-Card Half House:</strong> Play three cards of one value and two cards of another value (e.g., 7&spades;, 7&diams;, 7&hearts;, 2&clubs;, 2&hearts;). The value of the three-of-a-kind determines the strength.
+        </Typography>
+
+        <Typography variant="body1" paragraph>
+          <strong>Gameplay:</strong> Players take turns playing one of the above combinations to beat the previous play. If you cannot—or choose not to—beat the previous play, you must draw a card. The player who wins the round can start the next round with any allowed combination.
+        </Typography>
+
+        <Typography variant="body1" paragraph>
+          <strong>Winning:</strong> The first player to shed all of their cards is immediately declared the winner.
         </Typography>
       </DialogContent>
       <DialogActions>
@@ -128,7 +132,7 @@ const GameContent: React.FC = () => {
       selectedCards.length === 2 &&
       selectedCards[0].value !== selectedCards[1].value
     ) {
-      setErrorMessage("Doubles must be of the same value (e.g., 7 and 7)");
+      setErrorMessage("Doubles must be of the same value (ex, 7 & 7)");
       return;
     }
 
@@ -208,8 +212,37 @@ const GameContent: React.FC = () => {
           position: "relative",
           backgroundColor: "rgba(255, 255, 255, 0.8)",
           backdropFilter: "blur(4px)",
+          px: { xs: 2, sm: 3, md: 4 },
+          py: { xs: 2, sm: 3, md: 4 },
         }}
       >
+        {/* Logo */}
+        <Typography
+          sx={{
+            position: "absolute",
+            top: { xs: 6, sm: 10, md: 15 },
+            right: { xs: 20, sm: 40, md: 90 },
+            fontSize: { xs: "16px", sm: "18px", md: "20px" },
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: "600",
+            display: "flex",
+            alignItems: "center",
+            gap: { xs: "2px", sm: "3px", md: "4px" },
+            background: "linear-gradient(45deg,rgb(84, 46, 208) 30%,rgb(103, 0, 163) 90%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            textShadow: "0px 2px 4px rgba(0,0,0,0.1)",
+            "& span": {
+              color: "red",
+              fontSize: { xs: "14px", sm: "16px", md: "20px" },
+              textShadow: "0px 2px 4px rgba(0,0,0,0.2)",
+            }
+          }}
+        >
+          PseuDos
+          <span>❤️</span>
+        </Typography>
+
         {/* Winner Overlay */}
         {winner && (
           <Box
@@ -251,17 +284,102 @@ const GameContent: React.FC = () => {
           </Box>
         )}
 
-        <CardContent sx={{ p: 4 }}>
+        <CardContent sx={{ p: 0 }}>
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
-              gap: "1.5rem",
+              gridTemplateColumns: { xs: "1fr", md: "4fr 1fr" },
+              gap: { xs: 2, sm: 3, md: 4 },
+              width: "100%",
+              maxWidth: "100%",
+              margin: "0 auto",
             }}
           >
-            {/* Left Column: ComputerHand, PlayArea, PlayerHand */}
-            <Box>
-              <ComputerHand cardCount={computerHand.length} />
+            {/* Main Game Area */}
+            <Box sx={{ 
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0",
+              padding: "1rem",
+              maxWidth: "100%",
+              overflow: "hidden",
+            }}>
+              {/* Player's Hand */}
+              <Hand
+                cards={playerHand}
+                onSelectCard={handlePlayCard}
+                onDeselectCard={deselectCard}
+                selectedCards={selectedCards}
+                disabled={currentPlayer !== "player" || winner !== null}
+                isFiveCardRound={isFiveCardRound}
+                isPlayerTurn={currentPlayer === "player"}
+              />
+
+              {/* Mobile Action Buttons */}
+              <Box sx={{ 
+                display: { xs: "flex", md: "none" },
+                flexDirection: "column",
+                gap: 1,
+                mb: 1,
+                backgroundColor: "rgba(255, 255, 255, 0.5)",
+                padding: 1,
+                borderRadius: 2,
+              }}>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handlePlaySelectedCards}
+                    disabled={
+                      currentPlayer !== "player" ||
+                      selectedCards.length === 0 ||
+                      selectedCards.length === 3 ||
+                      selectedCards.length === 4 ||
+                      winner !== null
+                    }
+                    fullWidth
+                  >
+                    Play Card
+                    {selectedCards.length === 2
+                      ? "s (2)"
+                      : selectedCards.length > 2 && selectedCards.length < 5
+                      ? "s (?)"
+                      : selectedCards.length === 5
+                      ? "s (5)"
+                      : ""}
+                  </Button>
+
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={drawCard}
+                    disabled={
+                      currentPlayer !== "player" ||
+                      deckSize === 0 ||
+                      winner !== null
+                    }
+                    fullWidth
+                  >
+                    Draw Card
+                  </Button>
+                </Box>
+
+                {errorMessage && (
+                  <Typography 
+                    color="error" 
+                    variant="body2" 
+                    sx={{ 
+                      textAlign: "center",
+                      fontSize: "0.8rem",
+                      mt: 0.5
+                    }}
+                  >
+                    {errorMessage}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Play Area */}
               <PlayArea
                 playedCards={playArea}
                 selectedCards={selectedCards}
@@ -269,15 +387,12 @@ const GameContent: React.FC = () => {
                 onPlayCard={handlePlayCard}
                 isDoublesRound={isDoublesRound}
                 isFiveCardRound={isFiveCardRound}
+                currentPlayer={currentPlayer}
+                gameMessage={gameMessage}
               />
-              <Hand
-                cards={playerHand}
-                onSelectCard={selectCard}
-                onDeselectCard={deselectCard}
-                selectedCards={selectedCards}
-                disabled={currentPlayer !== "player" || winner !== null}
-                isFiveCardRound={isFiveCardRound}
-              />
+
+              {/* Computer's Hand */}
+              <ComputerHand cardCount={computerHand.length} />
             </Box>
 
             {/* Right Column: Deck, Draw/Play Buttons, Stats */}
@@ -287,52 +402,37 @@ const GameContent: React.FC = () => {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 2,
-                mt: 20,
+                mt: { xs: 2, md: 20 },
+                width: "100%",
+                margin: { xs: "0 auto", md: "0" },
+                px: { xs: 1, sm: 2 },
+                position: { xs: "relative", md: "sticky" },
+                top: { md: "10.5rem" },
+                pt: { md: "25rem" },
+                justifyContent: "flex-start",
+                alignSelf: "flex-start",
+                maxWidth: { xs: "100%", sm: "200px" },
+                backgroundColor: { md: "rgba(255, 255, 255, 0.5)" },
+                borderRadius: { md: "1rem" },
+                p: { md: 2 },
               }}
             >
-              {/* LOGO */}
-              <Typography
-                sx={{
-                  left: "10px",
-                  fontSize: "20px",
-                  fontFamily: "'Poppins', sans-serif",
-                  fontWeight: "regular",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  color: "#4e4e4e",
-                }}
-              >
-                PseuDos
-                <span style={{ color: "red", fontSize: "18px" }}>❤️</span>
-              </Typography>
-
-              {/* Deck to draw cards from */}
-              <Deck cardsLeft={deckSize} />
-
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={drawCard}
-                disabled={
-                  currentPlayer !== "player" ||
-                  deckSize === 0 ||
-                  winner !== null
-                }
-              >
-                Draw Card
-              </Button>
-
               <Button
                 variant="contained"
                 onClick={handlePlaySelectedCards}
                 disabled={
                   currentPlayer !== "player" ||
-                  selectedCards.length === 0 ||
-                  selectedCards.length === 3 ||
-                  selectedCards.length === 4 ||
+                  ![1, 2, 5].includes(selectedCards.length) ||
                   winner !== null
                 }
+                sx={{ 
+                  display: { xs: "none", md: "block" },
+                  marginBottom: "1rem",
+                  backgroundColor: "#2E8B57",
+                  "&:hover": {
+                    backgroundColor: "#3CB371",
+                  },
+                }}
               >
                 Play Card
                 {selectedCards.length === 2
@@ -345,22 +445,48 @@ const GameContent: React.FC = () => {
               </Button>
 
               {errorMessage && (
-                <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                <Typography color="error" variant="body2" sx={{ ml: 1, mt: -3 }}>
                   {errorMessage}
                 </Typography>
               )}
 
-              <Typography variant="subtitle1" fontWeight="bold">
-                Current Player: {currentPlayer}
-              </Typography>
-              <Typography variant="body2">{gameMessage}</Typography>
+              {/* Deck to draw cards from */}
+              <Deck 
+                cardsLeft={deckSize} 
+                onClick={drawCard}
+                disabled={
+                  currentPlayer !== "player" ||
+                  deckSize === 0 ||
+                  winner !== null
+                }
+              />
+
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={drawCard}
+                disabled={
+                  currentPlayer !== "player" ||
+                  deckSize === 0 ||
+                  winner !== null
+                }
+                sx={{ 
+                  display: { xs: "none", md: "block" },
+                  backgroundColor: "salmon",
+                  "&:hover": {
+                    backgroundColor: "#ff8c7a",
+                  },
+                }}
+              >
+                Draw Card
+              </Button>
 
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <Typography variant="body1">
-                  Player Wins: {playerWins}
+                  Your Wins: {playerWins}
                 </Typography>
                 <Typography variant="body1">
-                  Computer Wins: {computerWins}
+                  AI Wins: {computerWins}
                 </Typography>
               </Box>
 

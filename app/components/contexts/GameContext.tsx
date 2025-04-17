@@ -156,8 +156,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 14);
-    const initialComputerHand = deck.splice(0, 14);
+    const initialPlayerHand = deck.splice(0, 10);
+    const initialComputerHand = deck.splice(0, 10);
 
     setPlayerHand(initialPlayerHand);
     setComputerHand(initialComputerHand);
@@ -347,7 +347,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       if (playerHand.length - selectedCards.length === 0) {
         setGameMessage("Player has no more cards!");
       } else {
-        setGameMessage("Player played. Computer's turn.");
+        if (selectedCards.length === 1) {
+          setGameMessage(`Player played ${selectedCards[0].value}${selectedCards[0].suit}. Computer's turn.`);
+        } else if (selectedCards.length === 2) {
+          setGameMessage(`Player played 2 cards (${selectedCards[0].value}s). Computer's turn.`);
+        } else if (selectedCards.length === 5) {
+          setGameMessage(`Player played 5 cards. Computer's turn.`);
+        }
       }
       setCurrentPlayer("computer");
     } else {
@@ -392,8 +398,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       // Switch turn
       setCurrentPlayer(currentPlayer === "player" ? "computer" : "player");
-      setIsDoublesRound(false); // new round
-      setIsFiveCardRound(false); // new round
+      // Don't reset the round type when drawing
       setRoundReset(true); // any move is valid next
     }
   };

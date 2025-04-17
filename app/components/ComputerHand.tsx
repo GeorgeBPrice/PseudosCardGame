@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardContent, Typography } from "@mui/material";
+import { Card, CardContent, Typography, Box } from "@mui/material";
 
 interface ComputerHandProps {
   cardCount: number;
@@ -16,22 +16,63 @@ interface ComputerHandProps {
  */
 export default function ComputerHand({ cardCount }: ComputerHandProps) {
   return (
-    <div style={{ marginBottom: "1rem" }}>
-      <Typography variant="h6" fontWeight="bold" gutterBottom>
-        Computer’s Hand
-      </Typography>
-      <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
+    <Box sx={{ 
+      marginBottom: "1rem",
+      display: "flex",
+      gap: "1rem",
+      padding: "1rem",
+      border: "2px solid",
+      borderColor: "primary.main",
+      borderRadius: "1rem",
+      backgroundColor: "rgba(25, 118, 210, 0.05)",
+    }}>
+      {/* Vertical Label */}
+      <Box sx={{
+        width: "5%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(25, 118, 210, 0.1)",
+        borderRadius: "0.5rem",
+        border: "1px solid",
+        borderColor: "primary.main",
+      }}>
+        <Typography 
+          variant="h6" 
+          fontWeight="bold"
+          sx={{
+            writingMode: "vertical-rl",
+            transform: "rotate(180deg)",
+            textAlign: "center",
+            fontSize: { xs: "0.9rem", sm: "1rem" },
+            color: "primary.dark",
+          }}
+        >
+          A.I. Hand
+        </Typography>
+      </Box>
+
+      {/* Cards Container */}
+      <Box sx={{ 
+        flex: 1,
+        display: "flex", 
+        flexWrap: "wrap",
+        justifyContent: "center", 
+        gap: "0.5rem",
+        maxWidth: "100%",
+      }}>
         {Array.from({ length: cardCount }).map((_, index) => (
           <Card
             key={index}
             sx={{
-              width: { xs: 48, sm: 64 },
-              height: { xs: 72, sm: 96 },
+              width: { xs: 40, sm: 48, md: 64 },
+              height: { xs: 60, sm: 72, md: 96 },
               backgroundColor: "primary.main",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "primary.contrastText",
+              flexShrink: 0,
             }}
           >
             <CardContent
@@ -43,13 +84,19 @@ export default function ComputerHand({ cardCount }: ComputerHandProps) {
                 height: "100%",
               }}
             >
-              <Typography variant="h5" component="span">
+              <Typography 
+                variant="h5" 
+                component="span"
+                sx={{
+                  fontSize: { xs: "1.25rem", sm: "1.5rem", md: "1.75rem" }
+                }}
+              >
                 ?
               </Typography>
             </CardContent>
           </Card>
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
