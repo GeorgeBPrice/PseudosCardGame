@@ -156,8 +156,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 14);
-    const initialComputerHand = deck.splice(0, 14);
+    const initialPlayerHand = deck.splice(0, 10);
+    const initialComputerHand = deck.splice(0, 10);
 
     setPlayerHand(initialPlayerHand);
     setComputerHand(initialComputerHand);

@@ -106,7 +106,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
     <MUICard
       sx={{
         width: "100%",
-        height: "24rem",
+        height: { xs: "18rem", sm: "20rem", md: "24rem" },
         backgroundImage:
           "linear-gradient(180deg, #fdf9ff  100%, #edeeff  100%)",
         marginBottom: "1rem",
@@ -116,6 +116,8 @@ const PlayArea: React.FC<PlayAreaProps> = ({
         borderStyle: "dashed",
         borderColor: "#bbbeff",
         position: "relative",
+        maxWidth: "100%",
+        overflow: "hidden",
       }}
     >
       <CardContent
@@ -125,7 +127,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
         }}
         sx={{
           height: "100%",
-          padding: "1rem",
+          padding: { xs: "0.75rem", sm: "1rem" },
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -139,7 +141,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
             position: "absolute",
             top: "0.5rem",
             left: "1rem",
-            width: "70%",
+            width: { xs: "60%", sm: "70%" },
             maxHeight: "2rem",
             overflow: "hidden",
             display: "flex",
@@ -166,12 +168,12 @@ const PlayArea: React.FC<PlayAreaProps> = ({
               "&::-webkit-scrollbar": {
                 display: "none",
               },
-              paddingLeft: "2rem",
+              paddingLeft: "0.5rem",
               width: "100%",
               justifyContent: "flex-start",
             }}
           >
-            {playedCards.slice(-15).map((card, index, array) => (
+            {playedCards.slice(-10).map((card, index, array) => (
               <React.Fragment key={index}>
                 <Typography
                   variant="body1"
@@ -257,12 +259,12 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           }}
         >
           {isFiveCardRound && (
-            <Typography variant="h6" color="primary" fontWeight="bold">
+            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.5em 0 -0.5em"}>
               Five Card Hand
             </Typography>
           )}
           {isDoublesRound && (
-            <Typography variant="h6" color="primary" fontWeight="bold">
+            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.5em 0 -0.5em"}>
               Doubles
             </Typography>
           )}
@@ -309,7 +311,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
         {/* Display currently selected cards */}
         {selectedCards.length > 0 && (
           <Box sx={{ marginTop: "2rem", textAlign: "center" }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom margin={"-1.0em 0 0.25em"}>
               You are playing:
             </Typography>
             <Box
