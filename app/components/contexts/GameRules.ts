@@ -30,39 +30,121 @@ export const suitValues: Record<string, number> = {
   "♠": 1, "♣": 2, "♦": 3, "♥": 4
 };
 
+// Add the Play type definition
+export type Play = {
+  type: 'single' | 'pair' | 'triple' | 'straight' | 'fullhouse' | 'quads' | 'straightflush'; // Expand as needed
+  cards: CardType[];
+  rankValue: number; // Value of the highest card or primary component (e.g., triple in full house)
+  highestSuitValue?: number; // Optional: for tie-breaking (e.g., highest suit in pair)
+};
+
+// Add the getPlayInfo function definition
+export const getPlayInfo = (cards: CardType[]): Play | null => {
+  if (!cards || cards.length === 0) return null;
+
+  const n = cards.length;
+  // Ensure consistent sorting for comparisons and value extraction
+  const sortedCards = [...cards].sort((a, b) => cardValues[a.value] - cardValues[b.value] || suitValues[a.suit] - suitValues[b.suit]);
+  const highestCard = sortedCards[n - 1];
+  const highestRankValue = cardValues[highestCard.value];
+  const highestSuitValue = suitValues[highestCard.suit];
+
+  // --- Single ---
+  if (n === 1) {
+    return { type: 'single', cards: sortedCards, rankValue: highestRankValue, highestSuitValue: highestSuitValue };
+  }
+
+  // --- Pair ---
+  if (n === 2) {
+    if (sortedCards[0].value === sortedCards[1].value) {
+      return { type: 'pair', cards: sortedCards, rankValue: highestRankValue, highestSuitValue: Math.max(suitValues[sortedCards[0].suit], suitValues[sortedCards[1].suit]) };
+    }
+    return null;
+  }
+
+  // --- Triple --- (Add check for completeness, even if not played alone)
+   if (n === 3) {
+     if (sortedCards[0].value === sortedCards[1].value && sortedCards[1].value === sortedCards[2].value) {
+       return { type: 'triple', cards: sortedCards, rankValue: highestRankValue };
+     }
+     return null;
+   }
+
+  // --- Five Card Hands ---
+  if (n === 5) {
+    const isStraightCheck = isValidStraight(sortedCards);
+    const isTriplePlusTwoCheck = isValidTriplePlusTwo(sortedCards); // Assumes this checks for exactly 3 of one kind and 2 of another (or 3+any 2)
+
+    // Prioritize higher-ranked 5-card hands if rules define them (e.g., Straight Flush > Quads > Full House > Flush > Straight)
+    // For now, just check Straight and Full House based on existing helpers
+
+    if (isStraightCheck) {
+        const uniqueRanks = Array.from(new Set(sortedCards.map(c => cardValues[c.value]))).sort((a,b)=>a-b);
+        const isAceLow = uniqueRanks.length === 5 && uniqueRanks.join(',') === '2,3,4,5,14';
+        const rankVal = isAceLow ? 5 : highestRankValue; // Use 5 for A-low straight rank
+        // Ensure it's *only* a straight, not potentially a straight flush if suits match (add flush check if needed later)
+        return { type: 'straight', cards: sortedCards, rankValue: rankVal, highestSuitValue: getHighestSuitInStraight(sortedCards) };
+    }
+
+    if (isTriplePlusTwoCheck) {
+        // Find the triple's value for ranking
+        const valueCounts: Record<string, number> = {};
+        sortedCards.forEach(card => { valueCounts[card.value] = (valueCounts[card.value] || 0) + 1; });
+        const tripleValueStr = Object.entries(valueCounts).find(([_, count]) => count === 3)?.[0];
+        const tripleRankValue = tripleValueStr ? cardValues[tripleValueStr] : 0;
+        // Ensure it's not also a straight (e.g. 3,3,3,4,5 - unlikely based on card limits but good practice)
+        if (!isStraightCheck) {
+             return { type: 'fullhouse', cards: sortedCards, rankValue: tripleRankValue };
+        }
+    }
+  }
+
+  // TODO: Add checks for Quads (4 cards) if they are a valid play type
+
+  return null; // Return null if no valid known play type matches
+};
+
 /**
  * Check if the given 5 cards form a valid straight
- * Aces are always high in straights (10,J,Q,K,A)
+ * Accounts for pairs within the sequence (e.g., 4, 5, 5, 6, 7 is a 7-high straight)
+ * Aces can be high or low (A,2,3,4,5 or 10,J,Q,K,A)
  */
 export const isValidStraight = (cards: CardType[]): boolean => {
   if (cards.length !== 5) return false;
-  
-  // Sort cards by value, treating Aces as highest
-  const sortedCards = [...cards].sort((a, b) => {
-    const aValue = a.value === 'A' ? 14 : cardValues[a.value];
-    const bValue = b.value === 'A' ? 14 : cardValues[b.value];
-    return aValue - bValue;
-  });
-  
-  // Special case for A-high straight (10,J,Q,K,A)
-  if (sortedCards[0].value === '10' && 
-      sortedCards[1].value === 'J' && 
-      sortedCards[2].value === 'Q' && 
-      sortedCards[3].value === 'K' && 
-      sortedCards[4].value === 'A') {
-    return true;
+
+  const rankValues = cards.map(card => cardValues[card.value]);
+  const uniqueRanks = Array.from(new Set(rankValues)).sort((a, b) => a - b);
+
+  // Need at least 5 unique ranks OR the specific A-2-3-4-5 case for wrap-around
+  if (uniqueRanks.length < 5) {
+      // Check for A-2-3-4-5 (where unique ranks are 2, 3, 4, 5, 14)
+       const isAceLow = uniqueRanks.length === 5 && 
+                        uniqueRanks[0] === 2 && 
+                        uniqueRanks[1] === 3 && 
+                        uniqueRanks[2] === 4 && 
+                        uniqueRanks[3] === 5 && 
+                        uniqueRanks[4] === 14; // Ace
+       if (!isAceLow) return false;
+       // If it is Ace low, it's a valid straight
+       return true; 
   }
-  
-  // Check if values are consecutive
-  for (let i = 1; i < sortedCards.length; i++) {
-    const prevValue = sortedCards[i-1].value === 'A' ? 14 : cardValues[sortedCards[i-1].value];
-    const currValue = sortedCards[i].value === 'A' ? 14 : cardValues[sortedCards[i].value];
-    if (currValue !== prevValue + 1) {
-      return false;
+
+  // Check if the 5 unique ranks are consecutive
+  let isConsecutive = true;
+  for (let i = 1; i < uniqueRanks.length; i++) {
+    if (uniqueRanks[i] !== uniqueRanks[i - 1] + 1) {
+      isConsecutive = false;
+      break;
     }
   }
   
-  return true;
+  // Check for A-2-3-4-5 again (if ranks were originally 2,3,4,5,A)
+  const isAceLow = uniqueRanks.length === 5 && 
+                   uniqueRanks[0] === 2 && uniqueRanks[1] === 3 && uniqueRanks[2] === 4 && 
+                   uniqueRanks[3] === 5 && uniqueRanks[4] === 14; // Ace
+
+  // A straight is valid if the 5 unique ranks are consecutive OR it's the A-low special case
+  return isConsecutive || isAceLow;
 };
 
 /**
