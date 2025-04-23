@@ -25,7 +25,7 @@ const DraggableCard: React.FC<DraggableCardProps> = ({
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
-  }));
+  }), [card, disabled]);
 
   const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
 
@@ -42,7 +42,6 @@ const DraggableCard: React.FC<DraggableCardProps> = ({
           border: "2px solid",
           borderColor: isSelected ? "gold" : "blue",
           cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.5 : 1,
           transition: "transform 0.3s, box-shadow 0.3s",
           "&:hover": {
             transform: disabled ? "none" : "translateY(-4px)",
