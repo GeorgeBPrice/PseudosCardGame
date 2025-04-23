@@ -1,13 +1,13 @@
 /**
  * @fileoverview Game Context Provider and Hook for Pusoy Dos card game
- * 
+ *
  * This file defines the React Context and Provider for managing the game state and logic
  * for a Pusoy Dos card game. It includes:
- * 
+ *
  * - GameContext: React Context containing game state and actions
  * - useGameContext: Custom hook to access the game context
  * - GameContextType: TypeScript interface defining the shape of the context
- * 
+ *
  * The context manages:
  * - Player and computer hands
  * - Play area (currently played cards)
@@ -17,10 +17,10 @@
  * - Game statistics (wins)
  * - Game modes (doubles round, five card round)
  * - Game actions (select/play cards, draw cards, computer AI)
- * 
+ *
  * @requires React
  * @requires GameRules
- * 
+ *
  * @exports GameContext
  * @exports useGameContext
  * @exports GameContextType
@@ -28,10 +28,15 @@
  * @exports isValidStraight
  */
 
-
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import {
-  CardType,
+  CardType as OriginalCardType,
   cardValues,
   suitValues,
   isValidStraight,
@@ -40,16 +45,21 @@ import {
   isValidMove as isContextValidMove,
   getHighestSuitInStraight,
   Play,
-  getPlayInfo
+  getPlayInfo,
 } from "./GameRules";
 import { chooseBestPlay } from "./AIGameStrategy";
 
-export type { CardType };
+// Extend original CardType to include position
+export interface CardType extends OriginalCardType {
+  position?: { x: number; y: number };
+  hasBeenDragged?: boolean; // Flag for user interaction
+}
+
 export { isValidStraight };
 
 interface GameContextType {
   playerHand: CardType[];
-  computerHand: CardType[];
+  computerHand: OriginalCardType[]; // Computer hand doesn't need position
   playArea: CardType[];
   selectedCards: CardType[];
   currentPlayer: "player" | "computer";
@@ -67,6 +77,13 @@ interface GameContextType {
   computerPlay: () => void;
   startGame: () => void;
   playAgain: () => void;
+  updatePlayerCardPosition: (
+    cardId: number,
+    position: { x: number; y: number },
+    options?: { markAsDragged?: boolean }
+  ) => void;
+  resetPlayerHandLayoutFlags: () => void;
+  deselectAllCards: () => void;
 }
 
 /**
@@ -110,7 +127,7 @@ function createDeck() {
     "K",
     "A",
   ];
-  const newDeck: CardType[] = [];
+  const newDeck: OriginalCardType[] = []; // Start with original type
 
   for (let suit of suits) {
     for (let value of values) {
@@ -120,23 +137,25 @@ function createDeck() {
   return shuffleDeck(newDeck);
 }
 
-function shuffleDeck(deck: CardType[]) {
+function shuffleDeck(deck: OriginalCardType[]): CardType[] {
   for (let i = 0; i < 3; i++) {
     deck.sort(() => Math.random() - 0.5);
   }
-  return deck;
+  return deck.map((card, index) => ({
+    ...card,
+    position: { x: 10 + (index % 8) * 70, y: 10 + Math.floor(index / 8) * 50 },
+  }));
 }
 
 /**
  * Compare two 5-card combinations to determine if the new one beats the last one
  */
 
-
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [playerHand, setPlayerHand] = useState<CardType[]>([]);
-  const [computerHand, setComputerHand] = useState<CardType[]>([]);
+  const [computerHand, setComputerHand] = useState<OriginalCardType[]>([]); // Use original type
   const [playArea, setPlayArea] = useState<CardType[]>([]);
   const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<"player" | "computer">(
@@ -159,10 +178,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const startGame = () => {
     deck = createDeck();
-    const initialPlayerHand = deck.splice(0, 10);
+    const initialPlayerHandDraw = deck.splice(0, 10);
     const initialComputerHand = deck.splice(0, 10);
 
-    setPlayerHand(initialPlayerHand);
+    // Assign initial positions to player cards
+    const initialPlayerHandWithPositions: CardType[] =
+      initialPlayerHandDraw.map((card, index) => {
+        // Minimal initial position, layout handled client-side
+        return { ...card, position: { x: 0, y: 0 }, hasBeenDragged: false };
+      });
+
+    setPlayerHand(initialPlayerHandWithPositions);
     setComputerHand(initialComputerHand);
     setDeckSize(deck.length);
     setPlayArea([]);
@@ -186,6 +212,47 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       setGameMessage("Game started. Computer's turn.");
     }
   };
+
+  /**
+   * Updates the position of a card in the player's hand.
+   */
+  const updatePlayerCardPosition = useCallback(
+    (
+      cardId: number,
+      position: { x: number; y: number },
+      options?: { markAsDragged?: boolean }
+    ) => {
+      setPlayerHand((prevHand) =>
+        prevHand.map((card) =>
+          card.id === cardId
+            ? {
+                ...card,
+                position,
+                hasBeenDragged: options?.markAsDragged ?? card.hasBeenDragged,
+              }
+            : card
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * Resets the hasBeenDragged flag for all cards in the player's hand.
+   */
+  const resetPlayerHandLayoutFlags = useCallback(() => {
+    setPlayerHand((prevHand) =>
+      prevHand.map((card) => ({ ...card, hasBeenDragged: false }))
+    );
+  }, []);
+
+  /**
+   * Returns all selected cards back to the player's hand.
+   */
+  const deselectAllCards = useCallback(() => {
+    setPlayerHand((prevHand) => [...prevHand, ...selectedCards]);
+    setSelectedCards([]);
+  }, [selectedCards]);
 
   /**
    * Moves a card from player's hand to selected, up to 5.
@@ -221,7 +288,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     // Otherwise, it must be a single (or the start)
     if (playArea.length >= 1) {
-        return playArea.slice(-1);
+      return playArea.slice(-1);
     }
     return []; // Should not happen if playArea has cards, but safe fallback
   };
@@ -253,7 +320,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     // For five cards, must be either triple + 2 or straight
-    if (cards.length === 5 && !isValidTriplePlusTwo(cards) && !isValidStraight(cards)) {
+    if (
+      cards.length === 5 &&
+      !isValidTriplePlusTwo(cards) &&
+      !isValidStraight(cards)
+    ) {
       return false;
     }
 
@@ -300,29 +371,35 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       // Five cards -> compare new five cards
       const isLastStraight = isValidStraight(lastPlayed);
       const isNewStraight = isValidStraight(cards);
-      
+
       // If last play was a straight, new play must be a higher straight
       if (isLastStraight && !isNewStraight) return false;
-      
+
       // If last play was triple + 2, new play must be either:
       // 1. A straight (which always wins)
       // 2. A higher triple + 2
       if (!isLastStraight && !isNewStraight) {
         const getTripleValue = (cards: CardType[]): number => {
           const valueCounts: Record<string, number> = {};
-          cards.forEach(card => {
+          cards.forEach((card) => {
             valueCounts[card.value] = (valueCounts[card.value] || 0) + 1;
           });
-          const tripleValue = Object.entries(valueCounts).find(([_, count]) => count === 3)?.[0];
-          return tripleValue ? (tripleValue === 'A' ? 14 : cardValues[tripleValue]) : 0;
+          const tripleValue = Object.entries(valueCounts).find(
+            ([_, count]) => count === 3
+          )?.[0];
+          return tripleValue
+            ? tripleValue === "A"
+              ? 14
+              : cardValues[tripleValue]
+            : 0;
         };
-        
+
         const lastTripleValue = getTripleValue(lastPlayed);
         const newTripleValue = getTripleValue(cards);
-        
+
         return newTripleValue > lastTripleValue;
       }
-      
+
       // If we get here, it means we're comparing straights
       return compareFiveCardCombinations(cards, lastPlayed);
     }
@@ -358,9 +435,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         setGameMessage("Player has no more cards!");
       } else {
         if (selectedCards.length === 1) {
-          setGameMessage(`Player played ${selectedCards[0].value}${selectedCards[0].suit}. Computer's turn.`);
+          setGameMessage(
+            `Player played ${selectedCards[0].value}${selectedCards[0].suit}. Computer's turn.`
+          );
         } else if (selectedCards.length === 2) {
-          setGameMessage(`Player played 2 cards (${selectedCards[0].value}s). Computer's turn.`);
+          setGameMessage(
+            `Player played 2 cards (${selectedCards[0].value}s). Computer's turn.`
+          );
         } else if (selectedCards.length === 5) {
           setGameMessage(`Player played 5 cards. Computer's turn.`);
         }
@@ -398,7 +479,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       const newCard = deck.pop();
       if (newCard) {
         if (currentPlayer === "player") {
-          setPlayerHand((prev) => [...prev, newCard]);
+          setPlayerHand((prevHand) => {
+            // Calculate next position for the new card
+            const index = prevHand.length;
+            const cardWidth = 70;
+            const cardHeight = 50;
+            // Place drawn card at a fixed position (e.g., Row 2, far right)
+            // Minimal initial position for drawn card
+            const cardWithPosition: CardType = {
+              ...newCard,
+              position: { x: 0, y: 0 },
+              hasBeenDragged: false,
+            };
+            return [...prevHand, cardWithPosition];
+          });
           setGameMessage("Player drew a card. Computer's turn.");
         } else {
           setComputerHand((prev) => [...prev, newCard]);
@@ -421,7 +515,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     if (computerHand.length === 0) {
       setWinner("computer");
       setGameMessage("Computer wins!");
-      setComputerWins(prev => prev + 1);
+      setComputerWins((prev) => prev + 1);
       return;
     }
 
@@ -436,33 +530,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     // Call the AI strategy function
-    const gameState = { 
-        playAreaLength: playArea.length, 
-        opponentCardCount: playerHand.length // Pass opponent's (player's) card count
-    }; 
+    const gameState = {
+      playAreaLength: playArea.length,
+      opponentCardCount: playerHand.length, // Pass opponent's (player's) card count
+    };
     const bestPlay = chooseBestPlay(computerHand, lastPlay, gameState);
 
     if (bestPlay && bestPlay.cards.length > 0) {
       // AI found a valid play
       setPlayArea((prev) => [...prev, ...bestPlay.cards]);
       setComputerHand((prev) =>
-        prev.filter((card) => !bestPlay.cards.some((pc: CardType) => pc.id === card.id))
+        prev.filter(
+          (card) => !bestPlay.cards.some((pc: CardType) => pc.id === card.id)
+        )
       );
 
-      const remainingHand = computerHand.filter((card) => !bestPlay.cards.some((pc: CardType) => pc.id === card.id));
+      const remainingHand = computerHand.filter(
+        (card) => !bestPlay.cards.some((pc: CardType) => pc.id === card.id)
+      );
 
       if (remainingHand.length === 0) {
         setWinner("computer");
         setGameMessage("Computer has no more cards! Computer wins!");
-        setComputerWins(prev => prev + 1);
+        setComputerWins((prev) => prev + 1);
       } else {
         // Construct message based on play type
         let message = "Computer played";
-        if (bestPlay.type === 'single') {
+        if (bestPlay.type === "single") {
           message += ` ${bestPlay.cards[0].value}${bestPlay.cards[0].suit}.`;
-        } else if (bestPlay.type === 'pair') {
+        } else if (bestPlay.type === "pair") {
           message += ` a pair of ${bestPlay.cards[0].value}s.`;
-        } else if (bestPlay.type === 'triple') {
+        } else if (bestPlay.type === "triple") {
           message += ` three ${bestPlay.cards[0].value}s.`;
         } else {
           message += ` ${bestPlay.cards.length} cards.`; // Generic for 5-card hands for now
@@ -472,14 +570,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // Update round state based on the AI's play
-      const playedFive = bestPlay.cards.length === 5 && (bestPlay.type === 'straight' || bestPlay.type === 'fullhouse'); // More specific check
-      setIsDoublesRound(bestPlay.type === 'pair');
+      const playedFive =
+        bestPlay.cards.length === 5 &&
+        (bestPlay.type === "straight" || bestPlay.type === "fullhouse"); // More specific check
+      setIsDoublesRound(bestPlay.type === "pair");
       setIsFiveCardRound(playedFive);
-      setLastMoveWasDouble(bestPlay.type === 'pair');
-      setLastMoveWasFiveCard(playedFive); 
+      setLastMoveWasDouble(bestPlay.type === "pair");
+      setLastMoveWasFiveCard(playedFive);
       setRoundReset(false);
       setCurrentPlayer("player");
-
     } else {
       // AI chooses to pass (or couldn't find a move) -> Draw a card
       if (deckSize > 0) {
@@ -514,11 +613,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     if (playerHand.length === 0 && gameStarted) {
       setWinner("player");
       setGameMessage("Player wins!");
-      setPlayerWins(prev => prev + 1);
+      setPlayerWins((prev) => prev + 1);
     } else if (computerHand.length === 0 && gameStarted) {
       setWinner("computer");
       setGameMessage("Computer wins!");
-      setComputerWins(prev => prev + 1);
+      setComputerWins((prev) => prev + 1);
     }
   }, [playerHand, computerHand, gameStarted]);
 
@@ -544,6 +643,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
         computerPlay,
         startGame,
         playAgain,
+        updatePlayerCardPosition,
+        resetPlayerHandLayoutFlags,
+        deselectAllCards,
       }}
     >
       {children}

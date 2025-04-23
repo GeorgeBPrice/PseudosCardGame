@@ -1,8 +1,9 @@
 import React, { useRef } from "react";
 import { useDrop } from "react-dnd";
-import { Card as MUICard, CardContent, Typography, Box } from "@mui/material";
-import { CardType } from "./contexts/GameContext";
+import { Card as MUICard, CardContent, Typography, Box, IconButton } from "@mui/material";
+import { CardType, useGameContext } from "./contexts/GameContext";
 import { isValidStraight, isValidTriplePlusTwo } from "./contexts/GameRules";
+import ClearIcon from "@mui/icons-material/Clear";
 
 interface PlayAreaProps {
   playedCards: CardType[];
@@ -32,6 +33,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
   currentPlayer,
   gameMessage,
 }) => {
+  const { deselectAllCards } = useGameContext();
   const [{ isOver }, drop] = useDrop(() => ({
     accept: "card",
     drop: (item: CardType) => {
@@ -106,7 +108,7 @@ const PlayArea: React.FC<PlayAreaProps> = ({
     <MUICard
       sx={{
         width: "100%",
-        height: { xs: "18rem", sm: "20rem", md: "24rem" },
+        height: { xs: "18rem", sm: "20rem", md: "22rem" },
         backgroundImage:
           "linear-gradient(180deg, #fdf9ff  100%, #edeeff  100%)",
         marginBottom: "1rem",
@@ -249,70 +251,33 @@ const PlayArea: React.FC<PlayAreaProps> = ({
           </Typography>
         </Box>
 
-        {/* Last hand played */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "1rem",
-          }}
-        >
-          {isFiveCardRound && (
-            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.5em 0 -0.5em"}>
-              Five Card Hand
-            </Typography>
-          )}
-          {isDoublesRound && (
-            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.5em 0 -0.5em"}>
-              Doubles
-            </Typography>
-          )}
-          <Box
-            sx={{
-              display: "flex",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: "0.5rem",
-            }}
-          >
-            {getLastHand().map((card) => {
-              const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
-              return (
-                <MUICard
-                  key={card.id}
-                  sx={{
-                    width: { xs: 64, sm: 80 },
-                    height: { xs: 96, sm: 112 },
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid",
-                    borderColor: "blue",
-                    transition: "transform 0.3s",
-                    "&:hover": {
-                      transform: "translateY(-4px)",
-                    },
-                  }}
-                >
-                  <CardContent sx={{ p: 0, textAlign: "center" }}>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color }}>
-                      {card.value}
-                      {card.suit}
-                    </Typography>
-                  </CardContent>
-                </MUICard>
-              );
-            })}
-          </Box>
-        </Box>
-
         {/* Display currently selected cards */}
         {selectedCards.length > 0 && (
-          <Box sx={{ marginTop: "2rem", textAlign: "center" }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom margin={"-1.0em 0 0.25em"}>
-              You are playing:
+          <Box sx={{ marginTop: "2rem", textAlign: "center", position: "relative" }}>
+            {/* Reset Selected Button */}
+            <IconButton
+              onClick={deselectAllCards}
+              size="small"
+              sx={{
+                position: 'relative',
+                top: 0, 
+                right: 0,
+                marginTop: '-5px',
+                marginRight: '-130px',
+                zIndex: 2, 
+                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                '&:hover': {
+                   backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                }
+              }}
+              title="Return selected cards to hand"
+              disabled={selectedCards.length === 0}
+            >
+              <ClearIcon fontSize="small" />
+            </IconButton>
+
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom margin={"-1.5em 0 0"}>
+              Your Play:
             </Typography>
             <Box
               sx={{
@@ -330,8 +295,8 @@ const PlayArea: React.FC<PlayAreaProps> = ({
                     key={card.id}
                     onClick={() => onDeselectCard(card)}
                     sx={{
-                      width: { xs: 64, sm: 80 },
-                      height: { xs: 96, sm: 112 },
+                      width: { xs: 50, sm: 70 },
+                      height: { xs: 74, sm: 102 },
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -356,6 +321,70 @@ const PlayArea: React.FC<PlayAreaProps> = ({
             </Box>
           </Box>
         )}
+
+        {/* Last hand played */}
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem",
+          }}
+        >
+          {!isDoublesRound && !isFiveCardRound && (
+            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.0em 0 -1.0em"}>
+              Single
+            </Typography>
+          )}
+          {isDoublesRound && (
+            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.0em 0 -1.0em"}>
+              Doubles
+            </Typography>
+          )}
+          {isFiveCardRound && (
+            <Typography variant="h6" color="primary" fontWeight="bold" fontSize={"1.0rem"} margin={"1.0em 0 -1.0em"}>
+              Five Card Hand
+            </Typography>
+          )}
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            {getLastHand().map((card) => {
+              const color = card.suit === "♥" || card.suit === "♦" ? "red" : "black";
+              return (
+                <MUICard
+                  key={card.id}
+                  sx={{
+                    width: { xs: 50, sm: 70 },
+                    height: { xs: 74, sm: 102 },
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px solid",
+                    borderColor: "blue",
+                    transition: "transform 0.3s",
+                    "&:hover": {
+                      transform: "translateY(-4px)",
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 0, textAlign: "center" }}>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color }}>
+                      {card.value}
+                      {card.suit}
+                    </Typography>
+                  </CardContent>
+                </MUICard>
+              );
+            })}
+          </Box>
+        </Box>
       </CardContent>
     </MUICard>
   );

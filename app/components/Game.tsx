@@ -60,7 +60,7 @@ function RulesDialog({
         </Typography>
 
         <Typography variant="body1" paragraph>
-          <strong>5-Card Half House:</strong> Play three cards of one value and two cards of another value (e.g., 7&spades;, 7&diams;, 7&hearts;, 2&clubs;, 2&hearts;). The value of the three-of-a-kind determines the strength.
+          <strong>5-Card Half House:</strong> Play three cards of one value and two cards of another value (e.g., 7&spades;, 7&diams;, 7&hearts;, 2&clubs;, 6&hearts;). The value of the three-of-a-kind determines the strength.
         </Typography>
 
         <Typography variant="body1" paragraph>
@@ -213,7 +213,7 @@ const GameContent: React.FC = () => {
           backgroundColor: "rgba(255, 255, 255, 0.8)",
           backdropFilter: "blur(4px)",
           px: { xs: 2, sm: 3, md: 4 },
-          py: { xs: 2, sm: 3, md: 4 },
+          py: { xs: 2, sm: 3, md: 2 },
         }}
       >
         {/* Logo */}
@@ -312,9 +312,53 @@ const GameContent: React.FC = () => {
                 onDeselectCard={deselectCard}
                 selectedCards={selectedCards}
                 disabled={currentPlayer !== "player" || winner !== null}
-                isFiveCardRound={isFiveCardRound}
                 isPlayerTurn={currentPlayer === "player"}
               />
+
+              {/* Desktop Action Button (Moved Here) */}
+              <Box sx={{ 
+                display: { xs: "none", md: "flex" },
+                flexDirection: "column",
+                alignItems: "center",
+                mt: -1, // Add margin top for spacing
+                mb: 1,
+                width: '100%', // Ensure the box takes width for centering
+              }}>
+                <Button
+                  variant="contained"
+                  onClick={handlePlaySelectedCards}
+                  disabled={
+                    currentPlayer !== "player" ||
+                    ![1, 2, 5].includes(selectedCards.length) ||
+                    winner !== null
+                  }
+                  sx={{ 
+                    // display: { xs: "none", md: "block" }, // Controlled by parent Box now
+                    // marginBottom: "1rem", // Removed, handled by parent gap or mt/mb
+                    backgroundColor: "#2E8B57",
+                    "&:hover": {
+                      backgroundColor: "#3CB371",
+                    },
+                    minWidth: '120px', // Give button a minimum width
+                  }}
+                >
+                  
+                  {selectedCards.length === 1
+                    ? "Play Single"
+                    : selectedCards.length === 2
+                    ? "Play Double"
+                    : selectedCards.length > 2 && selectedCards.length < 5
+                    ? "Play (?)"
+                    : selectedCards.length === 5
+                    ? "Play Full Hand"
+                    : "Place Cards"}
+                </Button>
+                {errorMessage && (
+                  <Typography color="error" variant="body2" sx={{ mt: 1 }}> {/* Adjusted margin top */}
+                    {errorMessage}
+                  </Typography>
+                )}
+              </Box>
 
               {/* Mobile Action Buttons */}
               <Box sx={{ 
@@ -360,7 +404,8 @@ const GameContent: React.FC = () => {
                     }
                     fullWidth
                   >
-                    Draw Card
+                    {/* MOBILE ONLY */}
+                    Draw Card 
                   </Button>
                 </Box>
 
@@ -407,7 +452,7 @@ const GameContent: React.FC = () => {
                 margin: { xs: "0 auto", md: "0" },
                 px: { xs: 1, sm: 2 },
                 position: { xs: "relative", md: "sticky" },
-                top: { md: "10.5rem" },
+                top: { md: "20.5rem" },
                 pt: { md: "25rem" },
                 justifyContent: "flex-start",
                 alignSelf: "flex-start",
@@ -417,39 +462,6 @@ const GameContent: React.FC = () => {
                 p: { md: 2 },
               }}
             >
-              <Button
-                variant="contained"
-                onClick={handlePlaySelectedCards}
-                disabled={
-                  currentPlayer !== "player" ||
-                  ![1, 2, 5].includes(selectedCards.length) ||
-                  winner !== null
-                }
-                sx={{ 
-                  display: { xs: "none", md: "block" },
-                  marginBottom: "1rem",
-                  backgroundColor: "#2E8B57",
-                  "&:hover": {
-                    backgroundColor: "#3CB371",
-                  },
-                }}
-              >
-                Play Card
-                {selectedCards.length === 2
-                  ? "s (2)"
-                  : selectedCards.length > 2 && selectedCards.length < 5
-                  ? "s (?)"
-                  : selectedCards.length === 5
-                  ? "s (5)"
-                  : ""}
-              </Button>
-
-              {errorMessage && (
-                <Typography color="error" variant="body2" sx={{ ml: 1, mt: -3 }}>
-                  {errorMessage}
-                </Typography>
-              )}
-
               {/* Deck to draw cards from */}
               <Deck 
                 cardsLeft={deckSize} 
