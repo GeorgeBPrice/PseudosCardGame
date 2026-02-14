@@ -251,7 +251,7 @@ const Hand: React.FC<HandProps> = ({
           position: "absolute",
           top: 8,
           right: 8,
-          zIndex: 150,
+          zIndex: 2,
           backgroundColor: "rgba(255, 255, 255, 0.7)",
           "&:hover": {
             backgroundColor: "rgba(255, 255, 255, 0.9)",
