@@ -473,26 +473,23 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /**
    * Draw a card from the deck for the current player, skipping validity checks.
+   * If the player had cards in the play area (selected but not played), return them to the hand along with the drawn card.
    */
   const drawCard = () => {
     if (deckSize > 0) {
       const newCard = deck.pop();
       if (newCard) {
         if (currentPlayer === "player") {
+          // Return any selected (play-area) cards to hand, then add the drawn card
           setPlayerHand((prevHand) => {
-            // Calculate next position for the new card
-            const index = prevHand.length;
-            const cardWidth = 70;
-            const cardHeight = 50;
-            // Place drawn card at a fixed position (e.g., Row 2, far right)
-            // Minimal initial position for drawn card
             const cardWithPosition: CardType = {
               ...newCard,
               position: { x: 0, y: 0 },
               hasBeenDragged: false,
             };
-            return [...prevHand, cardWithPosition];
+            return [...prevHand, ...selectedCards, cardWithPosition];
           });
+          setSelectedCards([]);
           setGameMessage("Player drew a card. Computer's turn.");
         } else {
           setComputerHand((prev) => [...prev, newCard]);
